@@ -1,0 +1,72 @@
+/* --- Add these new styles or replace existing ones --- */
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: #f4f4f9; color: #333; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; padding: 20px; box-sizing: border-box; }
+.container { width: 100%; max-width: 1400px; background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 6px 12px rgba(0,0,0,0.1); }
+header { text-align: center; border-bottom: 1px solid #ddd; padding-bottom: 20px; margin-bottom: 20px; }
+h1 { margin: 0; color: #444; }
+h2 { font-size: 1.1em; margin: 0 0 10px 0; color: #555; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+.main-content { display: flex; flex-wrap: wrap; gap: 30px; }
+.controls { flex: 1; min-width: 320px; display: flex; flex-direction: column; gap: 15px; }
+.canvas-container { flex: 2; min-width: 400px; border: 2px dashed #ccc; border-radius: 8px; display: flex; justify-content: center; align-items: center; position: relative; min-height: 300px; background-color: #fafafa; }
+#canvas { max-width: 100%; max-height: 75vh; cursor: pointer; }
+#placeholder-text { position: absolute; color: #888; }
+#color-preview { position: fixed; background: rgba(0, 0, 0, 0.75); color: white; padding: 8px; border-radius: 6px; display: flex; align-items: center; pointer-events: none; backdrop-filter: blur(5px); z-index: 10; }
+#preview-swatch { width: 20px; height: 20px; border-radius: 4px; border: 1px solid #fff; margin-right: 8px; }
+#preview-text { font-size: 0.9em; display: flex; flex-direction: column; }
+.upload-btn { display: block; padding: 12px 20px; background: #007bff; color: #fff; border-radius: 5px; cursor: pointer; text-align: center; }
+.upload-btn-secondary { display: block; padding: 8px 15px; background: #6c757d; color: #fff; border-radius: 5px; cursor: pointer; text-align: center; margin-bottom: 10px; }
+input[type="file"] { display: none; }
+.color-box { padding: 15px; border: 1px solid #ddd; border-radius: 8px; }
+.color-display { display: flex; align-items: center; gap: 15px; }
+.color-swatch { width: 40px; height: 40px; border-radius: 8px; border: 1px solid #ccc; background-color: #f0f0f0; }
+.color-codes { display: flex; flex-direction: column; font-family: monospace; }
+.text-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.text-inputs input { width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 4px; text-align: center; box-sizing: border-box; }
+input[type="color"] { width: 40px; height: 40px; border: none; padding: 0; border-radius: 8px; cursor: pointer; }
+.tolerance-section input { width: 100%; }
+.actions { display: flex; flex-direction: column; gap: 10px; margin-top: auto; }
+button { padding: 12px 15px; border: none; border-radius: 5px; cursor: pointer; font-size: 1em; }
+button:disabled { background: #e9ecef; color: #6c757d; cursor: not-allowed; }
+.action-btn { background: #28a745; color: #fff; }
+#undoBtn { background: #ffc107; color: #333; }
+#downloadBtn { background: #6c757d; color: #fff; }
+
+/* --- TABS --- */
+.tabs { display: flex; border-bottom: 1px solid #ddd; margin-bottom: 10px; }
+.tab-button { background: none; border: none; padding: 10px 15px; cursor: pointer; font-size: 1em; color: #007bff; border-bottom: 3px solid transparent; }
+.tab-button.active { border-bottom-color: #007bff; font-weight: bold; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* --- PALETTE IMAGE --- */
+.palette-canvas-container { position: relative; width: 100%; min-height: 100px; border: 1px solid #eee; display: flex; justify-content: center; align-items: center; }
+#paletteCanvas { max-width: 100%; cursor: crosshair; }
+#palettePlaceholder { color: #aaa; }
+
+/* --- Add these new styles to the end of your existing CSS file --- */
+
+/* TABS */
+.tabs { display: flex; border-bottom: 1px solid #ddd; margin-bottom: 10px; }
+.tab-button { background: none; border: none; padding: 10px 15px; cursor: pointer; font-size: 1em; color: #007bff; border-bottom: 3px solid transparent; }
+.tab-button.active { border-bottom-color: #007bff; font-weight: bold; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* PALETTE IMAGE */
+.palette-canvas-container { position: relative; width: 100%; min-height: 100px; border: 1px solid #eee; display: flex; justify-content: center; align-items: center; background-color: #fdfdfd; }
+#paletteCanvas { max-width: 100%; cursor: crosshair; }
+#palettePlaceholder { color: #aaa; font-size: 0.9em; }
+
+/* NEW: PALETTE COLOR DISPLAY BOX */
+.color-display-box {
+    margin-top: 15px;
+    padding: 10px;
+    background-color: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+}
+.color-display-box h4 {
+    margin: 0 0 10px 0;
+    font-size: 0.9em;
+    color: #6c757d;
+    font-weight: normal;
+}

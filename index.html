@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Image Color Replacer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Advanced Image Color Replacer</h1>
+            <p>Select a color from your main image, then choose a new color manually or pick one from a second image.</p>
+        </header>
+
+        <div class="main-content">
+            <div class="controls">
+                <!-- Step 1 & 2 -->
+                <div class="upload-section">
+                    <label for="imageLoader" class="upload-btn">1. Upload Main Image</label>
+                    <input type="file" id="imageLoader" accept="image/*">
+                </div>
+                <div id="selected-color-section" class="color-box">
+                    <h2>2. Color to Replace (Click Image)</h2>
+                    <div class="color-display">
+                        <div id="selected-color-swatch" class="color-swatch"></div>
+                        <div class="color-codes">
+                            <span id="selected-hex">HEX: --</span>
+                            <span id="selected-rgb">RGB: --, --, --</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3: Redesigned with Tabs -->
+                <div class="color-selection color-box">
+                    <h2>3. Choose New Color</h2>
+                    <div class="tabs">
+                        <button class="tab-button active" data-tab="tab-picker">Picker & Manual</button>
+                        <button class="tab-button" data-tab="tab-image">From Image</button>
+                    </div>
+                    <!-- Tab Content -->
+                    <div id="tab-picker" class="tab-content active">
+                        <div class="color-display">
+                             <input type="color" id="colorPicker" value="#0099ff">
+                             <div class="text-inputs">
+                                <input type="text" id="hexInput" value="#0099ff" placeholder="HEX">
+                                <input type="number" id="rInput" min="0" max="255" value="0" placeholder="R">
+                                <input type="number" id="gInput" min="0" max="255" value="153" placeholder="G">
+                                <input type="number" id="bInput" min="0" max="255" value="255" placeholder="B">
+                            </div>
+                        </div>
+                    </div>
+                    <div id="tab-image" class="tab-content">
+                        <label for="paletteImageLoader" class="upload-btn-secondary">Upload Palette Image</label>
+                        <input type="file" id="paletteImageLoader" accept="image/*">
+                        <div class="palette-canvas-container">
+                            <canvas id="paletteCanvas"></canvas>
+                            <span id="palettePlaceholder">Palette image will appear here</span>
+                        </div>
+                        <!-- NEW DISPLAY FOR PALETTE COLOR -->
+                        <div id="palette-selection-display" class="color-display-box">
+                            <h4>Selected Palette Color</h4>
+                            <div class="color-display">
+                                <div id="palette-selection-swatch" class="color-swatch"></div>
+                                <div class="color-codes">
+                                    <span id="palette-selection-hex">HEX: --</span>
+                                    <span id="palette-selection-rgb">RGB: --, --, --</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 4 & 5 -->
+                <div class="tolerance-section">
+                    <h2>4. Set Tolerance (%)</h2>
+                    <input type="range" id="toleranceSlider" min="0" max="100" value="10">
+                    <span id="toleranceValue">10%</span>
+                </div>
+                <div class="actions">
+                    <button id="replaceBtn" class="action-btn" disabled>5. Replace Color</button>
+                    <button id="undoBtn" disabled>Undo</button>
+                    <button id="downloadBtn" disabled>Download</button>
+                </div>
+            </div>
+
+            <div class="canvas-container">
+                <canvas id="canvas"></canvas>
+                <div id="placeholder-text">Your image will appear here</div>
+                <div id="color-preview" style="display: none;">
+                    <div id="preview-swatch"></div>
+                    <div id="preview-text"><span id="preview-hex"></span><span id="preview-rgb"></span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
