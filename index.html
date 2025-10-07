@@ -57,7 +57,6 @@
                             <canvas id="paletteCanvas"></canvas>
                             <span id="palettePlaceholder">Palette image will appear here</span>
                         </div>
-                        <!-- NEW DISPLAY FOR PALETTE COLOR -->
                         <div id="palette-selection-display" class="color-display-box">
                             <h4>Selected Palette Color</h4>
                             <div class="color-display">
@@ -94,6 +93,18 @@
             </div>
         </div>
     </div>
+
+    <!-- Download Progress Overlay -->
+    <div id="download-overlay">
+        <div class="overlay-content">
+            <h3 id="progress-text">Preparing your image...</h3>
+            <div class="progress-bar-container">
+                <div id="progress-bar-fill"></div>
+            </div>
+            <button id="close-overlay-btn" style="display: none;">Close</button>
+        </div>
+    </div>
+
     <script src="script.js"></script>
 </body>
 </html>
