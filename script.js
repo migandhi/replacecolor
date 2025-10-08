@@ -126,8 +126,8 @@ selectionCanvas.addEventListener('mousedown', (e) => {
     if (!isImageLoaded) return;
     const startPos = getCanvasPos(e);
     let hasMoved = false;
-    currentPath = [startPos];
     isInteracting = true;
+    currentPath = [startPos];
 
     const onMouseMove = (moveEvent) => {
         if (!isInteracting) return;
@@ -205,7 +205,6 @@ function animateSelectionBoundaries() {
         
         const hasSelections = selections.length > 0;
         if (hasSelections) {
-            // Draw white dashed line
             selectionCtx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
             selectionCtx.lineWidth = 1;
             selectionCtx.setLineDash([4, 4]);
@@ -224,10 +223,9 @@ function animateSelectionBoundaries() {
             });
             selectionCtx.stroke();
             
-            // Draw black dashed line (offset)
             selectionCtx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
             selectionCtx.lineDashOffset = -offset + 4;
-            selectionCtx.stroke(); // Stroke the same path again
+            selectionCtx.stroke();
         }
         
         if (isInteracting && currentPath.length > 1 && currentTool !== 'none') {
@@ -306,6 +304,8 @@ replaceBtn.addEventListener('click', () => {
     if (!selectedColor) return;
     lastConfirmedColorToReplace = selectedColor;
     replaceColor(lastConfirmedColorToReplace, true);
+    clearSelectedColor(); 
+    document.getElementById('tool-none').click();
 });
 toleranceSlider.addEventListener('input', () => {
     toleranceValue.textContent = `Tolerance: ${toleranceSlider.value}`;
