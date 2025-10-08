@@ -4,6 +4,8 @@ const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const selectionCanvas = document.getElementById('selectionCanvas');
 const selectionCtx = selectionCanvas.getContext('2d');
+const maskCanvas = document.getElementById('maskCanvas');
+const maskCtx = maskCanvas.getContext('2d');
 const placeholderText = document.getElementById('placeholder-text');
 const colorPreview = document.getElementById('color-preview');
 const previewSwatch = document.getElementById('preview-swatch');
@@ -32,7 +34,7 @@ const downloadBtn = document.getElementById('downloadBtn');
 const toleranceSlider = document.getElementById('toleranceSlider');
 const toleranceValue = document.getElementById('toleranceValue');
 const modeToggle = document.getElementById('mode-toggle');
-const limitToSelectionToggle = document.getElementById('limit-to-selection-toggle');
+const toolRadios = document.querySelectorAll('input[name="tool"]');
 const clearSelectionBtn = document.getElementById('clear-selection-btn');
 const downloadOverlay = document.getElementById('download-overlay');
 const progressText = document.getElementById('progress-text');
@@ -45,8 +47,9 @@ let history = [];
 let selectedColor = null;
 let lastConfirmedColorToReplace = null;
 let previewTimeout;
-let isSelecting = false;
-let selectionRect = null;
+let isDrawing = false;
+let currentTool = 'none';
+let currentPath = [];
 
 // --- Image Loading ---
 imageLoader.addEventListener('change', e => loadImage(e, true));
@@ -62,10 +65,12 @@ function loadImage(e, isMainImage) {
                 canvas.height = img.height;
                 selectionCanvas.width = img.width;
                 selectionCanvas.height = img.height;
+                maskCanvas.width = img.width;
+                maskCanvas.height = img.height;
                 ctx.drawImage(img, 0, 0);
                 placeholderText.style.display = 'none';
                 history = [ctx.getImageData(0, 0, canvas.width, canvas.height)];
-                clearSelection();
+                clearAllSelections();
                 selectedColor = null;
                 lastConfirmedColorToReplace = null;
                 isImageLoaded = true;
@@ -84,8 +89,16 @@ function loadImage(e, isMainImage) {
     reader.readAsDataURL(e.target.files[0]);
 }
 
-// --- Area Selection Logic ---
-function getSelectionPos(e) {
+// --- Tool Selection & Drawing Logic ---
+toolRadios.forEach(radio => {
+    radio.addEventListener('change', (e) => {
+        currentTool = e.target.value;
+        selectionCanvas.style.cursor = (currentTool === 'none') ? 'pointer' : 'crosshair';
+    });
+});
+clearSelectionBtn.addEventListener('click', clearAllSelections);
+
+function getCanvasPos(e) {
     const rect = selectionCanvas.getBoundingClientRect();
     const scaleX = selectionCanvas.width / rect.width;
     const scaleY = selectionCanvas.height / rect.height;
@@ -94,61 +107,100 @@ function getSelectionPos(e) {
 
 selectionCanvas.addEventListener('mousedown', (e) => {
     if (!isImageLoaded) return;
-    const startPos = getSelectionPos(e);
-    let moved = false;
+    isDrawing = true;
+    const startPos = getCanvasPos(e);
+    currentPath = [startPos];
 
     function onMouseMove(moveEvent) {
-        if (!isSelecting) {
-            const currentPos = getSelectionPos(moveEvent);
-            // Start selecting only if the mouse has moved a small distance
-            if (Math.abs(currentPos.x - startPos.x) > 5 || Math.abs(currentPos.y - startPos.y) > 5) {
-                isSelecting = true;
-                moved = true;
-                selectionRect = { startX: startPos.x, startY: startPos.y, endX: currentPos.x, endY: currentPos.y };
-            }
-        }
-        if (isSelecting) {
-            const currentPos = getSelectionPos(moveEvent);
-            selectionRect.endX = currentPos.x;
-            selectionRect.endY = currentPos.y;
-            drawSelectionRect();
-        }
+        if (!isDrawing) return;
+        const currentPos = getCanvasPos(moveEvent);
+        currentPath.push(currentPos);
+        drawTemporarySelection();
     }
 
-    function onMouseUp(upEvent) {
-        if (!moved) { // It was a click, not a drag
-            const { r, g, b } = getColorAtCursor(upEvent, canvas, ctx);
+    function onMouseUp() {
+        if (currentPath.length <= 1 && currentTool === 'none') {
+            const { r, g, b } = getColorAtCursor(e, canvas, ctx);
             selectedColor = { r, g, b };
             updateSelectedColorUI();
-        } else { // It was a drag
-            limitToSelectionToggle.checked = true;
+        } else if (currentPath.length > 1) {
+            commitCurrentPathToMask();
         }
-        isSelecting = false;
+        isDrawing = false;
+        currentPath = [];
+        drawSelectionBoundaries();
         updateButtonStates();
         window.removeEventListener('mousemove', onMouseMove);
         window.removeEventListener('mouseup', onMouseUp);
     }
-
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
 });
 
-clearSelectionBtn.addEventListener('click', clearSelection);
-
-function drawSelectionRect() {
-    selectionCtx.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
-    if (!selectionRect) return;
-    selectionCtx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+function drawTemporarySelection() {
+    drawSelectionBoundaries(); // Redraw persistent boundaries
+    selectionCtx.strokeStyle = 'rgba(0, 123, 255, 0.7)'; // Use a different color for live drawing
     selectionCtx.lineWidth = 2;
-    selectionCtx.setLineDash([5, 5]);
-    const width = selectionRect.endX - selectionRect.startX;
-    const height = selectionRect.endY - selectionRect.startY;
-    selectionCtx.strokeRect(selectionRect.startX, selectionRect.startY, width, height);
+    selectionCtx.setLineDash([]); // Solid line for temporary drawing
+
+    if (currentTool === 'rect' && currentPath.length > 1) {
+        const start = currentPath[0];
+        const end = currentPath[currentPath.length - 1];
+        selectionCtx.strokeRect(start.x, start.y, end.x - start.x, end.y - start.y);
+    } else if (currentTool === 'lasso' && currentPath.length > 1) {
+        selectionCtx.beginPath();
+        selectionCtx.moveTo(currentPath[0].x, currentPath[0].y);
+        for (let i = 1; i < currentPath.length; i++) {
+            selectionCtx.lineTo(currentPath[i].x, currentPath[i].y);
+        }
+        selectionCtx.stroke();
+    }
 }
-function clearSelection() {
-    selectionRect = null;
-    limitToSelectionToggle.checked = false;
+
+function commitCurrentPathToMask() {
+    maskCtx.fillStyle = 'white';
+    maskCtx.beginPath();
+    if (currentTool === 'rect' && currentPath.length > 1) {
+        const start = currentPath[0];
+        const end = currentPath[currentPath.length - 1];
+        maskCtx.rect(start.x, start.y, end.x - start.x, end.y - start.y);
+    } else if (currentTool === 'lasso' && currentPath.length > 1) {
+        maskCtx.moveTo(currentPath[0].x, currentPath[0].y);
+        for (let i = 1; i < currentPath.length; i++) {
+            maskCtx.lineTo(currentPath[i].x, currentPath[i].y);
+        }
+        maskCtx.closePath();
+    }
+    maskCtx.fill();
+}
+
+function drawSelectionBoundaries() {
     selectionCtx.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
+    if (maskCanvas.getContext('2d').getImageData(0, 0, 1, 1).data[3] === 0) return; // Quick check if mask is empty
+    
+    // Create a temporary canvas to draw the boundary from the mask
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCanvas.width = canvas.width;
+    tempCanvas.height = canvas.height;
+    
+    // Draw the mask onto the temp canvas
+    tempCtx.drawImage(maskCanvas, 0, 0);
+
+    // Use globalCompositeOperation to "trace" the edge
+    tempCtx.globalCompositeOperation = 'source-in';
+    tempCtx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+    tempCtx.lineWidth = 4;
+    tempCtx.setLineDash([8, 8]);
+    tempCtx.strokeRect(0, 0, canvas.width, canvas.height);
+
+    // Draw the result back to the visible selection canvas
+    selectionCtx.drawImage(tempCanvas, 0, 0);
+}
+
+function clearAllSelections() {
+    maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+    drawSelectionBoundaries();
     updateButtonStates();
 }
 
@@ -158,35 +210,31 @@ function replaceColor(colorToReplace, saveToHistory) {
     const sourceImageData = history[history.length - 1];
     const newImageData = new ImageData(new Uint8ClampedArray(sourceImageData.data), sourceImageData.width, sourceImageData.height);
     const data = newImageData.data;
+    const maskData = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height).data;
+    const hasSelection = maskData.some(a => a > 0);
+
     const newColorRgb = hexToRgb(colorPicker.value);
     const tolerance = toleranceSlider.value;
     const isAdvancedMode = modeToggle.checked;
     const newColorHsl = isAdvancedMode ? rgbToHsl(newColorRgb.r, newColorRgb.g, newColorRgb.b) : null;
     const targetLab = rgbToLab(colorToReplace.r, colorToReplace.g, colorToReplace.b);
 
-    let startX = 0, endX = canvas.width, startY = 0, endY = canvas.height;
-    if (limitToSelectionToggle.checked && selectionRect) {
-        startX = Math.floor(Math.min(selectionRect.startX, selectionRect.endX));
-        endX = Math.ceil(Math.max(selectionRect.startX, selectionRect.endX));
-        startY = Math.floor(Math.min(selectionRect.startY, selectionRect.endY));
-        endY = Math.ceil(Math.max(selectionRect.startY, selectionRect.endY));
-    }
+    for (let i = 0; i < data.length; i += 4) {
+        if (hasSelection && maskData[i + 3] === 0) {
+            continue; // Skip pixel if there's a selection and this pixel isn't in it
+        }
 
-    for (let y = startY; y < endY; y++) {
-        for (let x = startX; x < endX; x++) {
-            const i = (y * canvas.width + x) * 4;
-            const r = sourceImageData.data[i], g = sourceImageData.data[i + 1], b = sourceImageData.data[i + 2];
-            const currentLab = rgbToLab(r, g, b);
-            const deltaE = Math.sqrt(Math.pow(currentLab[0] - targetLab[0], 2) + Math.pow(currentLab[1] - targetLab[1], 2) + Math.pow(currentLab[2] - targetLab[2], 2));
+        const r = sourceImageData.data[i], g = sourceImageData.data[i + 1], b = sourceImageData.data[i + 2];
+        const currentLab = rgbToLab(r, g, b);
+        const deltaE = Math.sqrt(Math.pow(currentLab[0] - targetLab[0], 2) + Math.pow(currentLab[1] - targetLab[1], 2) + Math.pow(currentLab[2] - targetLab[2], 2));
 
-            if (deltaE <= tolerance) {
-                if (isAdvancedMode) {
-                    const originalHsl = rgbToHsl(r, g, b);
-                    const finalRgb = hslToRgb(newColorHsl[0], newColorHsl[1], originalHsl[2]);
-                    data[i] = finalRgb[0]; data[i + 1] = finalRgb[1]; data[i + 2] = finalRgb[2];
-                } else {
-                    data[i] = newColorRgb.r; data[i + 1] = newColorRgb.g; data[i + 2] = newColorRgb.b;
-                }
+        if (deltaE <= tolerance) {
+            if (isAdvancedMode) {
+                const originalHsl = rgbToHsl(r, g, b);
+                const finalRgb = hslToRgb(newColorHsl[0], newColorHsl[1], originalHsl[2]);
+                data[i] = finalRgb[0]; data[i + 1] = finalRgb[1]; data[i + 2] = finalRgb[2];
+            } else {
+                data[i] = newColorRgb.r; data[i + 1] = newColorRgb.g; data[i + 2] = newColorRgb.b;
             }
         }
     }
@@ -197,7 +245,8 @@ function replaceColor(colorToReplace, saveToHistory) {
     }
 }
 
-// --- Event Listeners and UI Updates ---
+// --- All other functions remain the same ---
+// (Paste of full, working functions below for completeness)
 replaceBtn.addEventListener('click', () => {
     if (!selectedColor) return;
     lastConfirmedColorToReplace = selectedColor;
@@ -216,6 +265,7 @@ undoBtn.addEventListener('click', () => {
         history.pop();
         lastConfirmedColorToReplace = null;
         ctx.putImageData(history[history.length - 1], 0, 0);
+        clearAllSelections(); // Selections are tied to a specific history state
         updateButtonStates();
     }
 });
@@ -260,8 +310,8 @@ function updateButtonStates() {
     replaceBtn.disabled = !selectedColor || !isImageLoaded;
     downloadBtn.disabled = history.length <= 1;
     undoBtn.disabled = history.length <= 1;
-    clearSelectionBtn.disabled = !selectionRect;
-    limitToSelectionToggle.disabled = !selectionRect;
+    const hasSelection = maskCanvas.getContext('2d').getImageData(0, 0, 1, 1).data[3] > 0 || maskCanvas.getContext('2d').getImageData(maskCanvas.width - 1, maskCanvas.height - 1, 1, 1).data[3] > 0;
+    clearSelectionBtn.disabled = !hasSelection;
 }
 function updateSelectedColorUI() {
     if (selectedColor) {
@@ -281,7 +331,7 @@ function resetPaletteSelectionUI() {
     paletteSelectionRgb.textContent = 'RGB: --, --, --';
 }
 selectionCanvas.addEventListener('mousemove', (e) => {
-    if (!isImageLoaded || isSelecting) return;
+    if (!isImageLoaded || isDrawing) return;
     const { r, g, b } = getColorAtCursor(e, canvas, ctx);
     updatePreviewTooltip(e, r, g, b);
 });
@@ -316,8 +366,6 @@ function syncColorInputs(color, source) {
     paletteSelectionHex.textContent = `HEX: ${hex}`;
     paletteSelectionRgb.textContent = `RGB: ${r}, ${g}, ${b}`;
 }
-
-// --- UTILITY FUNCTIONS ---
 function getColorAtCursor(e, targetCanvas, targetCtx) {
     const rect = targetCanvas.getBoundingClientRect();
     const x = e.clientX - rect.left;

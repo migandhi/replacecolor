@@ -10,7 +10,7 @@
     <div class="container">
         <header>
             <h1>Advanced Image Color Replacer</h1>
-            <p>Select a color to replace. Optionally, drag on the image to limit the replacement to a specific area.</p>
+            <p>Select a color, choose a selection tool, and replace color only where you want it.</p>
         </header>
 
         <div class="main-content">
@@ -69,18 +69,15 @@
                     </div>
                 </div>
 
-                <!-- Step 4: Area Selection -->
-                <div class="area-selection-section color-box">
-                    <h2>4. Area (Optional: Drag on Image)</h2>
-                    <div class="toggle-switch-container">
-                        <span>Entire Image</span>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="limit-to-selection-toggle" disabled>
-                            <span class="slider"></span>
-                        </label>
-                        <span>Limit to Selection</span>
+                <!-- Step 4: Selection Tool -->
+                <div class="selection-tool-section color-box">
+                    <h2>4. Selection Tool</h2>
+                    <div class="radio-group">
+                        <label><input type="radio" name="tool" value="none" checked> None (Entire Image)</label>
+                        <label><input type="radio" name="tool" value="rect"> Rectangle</label>
+                        <label><input type="radio" name="tool" value="lasso"> Lasso</label>
                     </div>
-                    <button id="clear-selection-btn" disabled>Clear Selection</button>
+                    <button id="clear-selection-btn" disabled>Clear All Selections</button>
                 </div>
                 
                 <!-- Step 5 & 6 -->
@@ -111,7 +108,8 @@
 
             <div class="canvas-container">
                 <canvas id="canvas"></canvas>
-                <canvas id="selectionCanvas"></canvas>
+                <canvas id="selectionCanvas"></canvas> <!-- For drawing boundaries -->
+                <canvas id="maskCanvas" class="hidden"></canvas> <!-- For the logical mask -->
                 <div id="placeholder-text">Your image will appear here</div>
                 <div id="color-preview" style="display: none;">
                     <div id="preview-swatch"></div>
