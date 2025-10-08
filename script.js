@@ -34,8 +34,11 @@ const downloadBtn = document.getElementById('downloadBtn');
 const toleranceSlider = document.getElementById('toleranceSlider');
 const toleranceValue = document.getElementById('toleranceValue');
 const modeToggle = document.getElementById('mode-toggle');
-const toolRadios = document.querySelectorAll('input[name="tool"]');
+const toolBtns = document.querySelectorAll('.tool-btn');
 const clearSelectionBtn = document.getElementById('clear-selection-btn');
+const undoSelectionBtn = document.getElementById('undo-selection-btn');
+const clearSelectedColorBtn = document.getElementById('clear-selected-color-btn');
+const resetNewColorBtn = document.getElementById('reset-new-color-btn');
 const downloadOverlay = document.getElementById('download-overlay');
 const progressText = document.getElementById('progress-text');
 const progressBarFill = document.getElementById('progress-bar-fill');
@@ -47,9 +50,13 @@ let history = [];
 let selectedColor = null;
 let lastConfirmedColorToReplace = null;
 let previewTimeout;
-let isDrawing = false;
+let isInteracting = false;
+let selections = [];
 let currentTool = 'none';
 let currentPath = [];
+let animationFrameId;
+
+const DEFAULT_NEW_COLOR = "#0099ff";
 
 // --- Image Loading ---
 imageLoader.addEventListener('change', e => loadImage(e, true));
@@ -71,10 +78,9 @@ function loadImage(e, isMainImage) {
                 placeholderText.style.display = 'none';
                 history = [ctx.getImageData(0, 0, canvas.width, canvas.height)];
                 clearAllSelections();
-                selectedColor = null;
+                clearSelectedColor();
                 lastConfirmedColorToReplace = null;
                 isImageLoaded = true;
-                updateSelectedColorUI();
                 updateButtonStates();
             } else {
                 paletteCanvas.width = img.width;
@@ -90,13 +96,24 @@ function loadImage(e, isMainImage) {
 }
 
 // --- Tool Selection & Drawing Logic ---
-toolRadios.forEach(radio => {
-    radio.addEventListener('change', (e) => {
-        currentTool = e.target.value;
-        selectionCanvas.style.cursor = (currentTool === 'none') ? 'pointer' : 'crosshair';
+toolBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        toolBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentTool = btn.id.replace('tool-', '');
+        selectionCanvas.className = (currentTool === 'none') ? 'cursor-eyedropper' : 'cursor-crosshair';
     });
 });
+
 clearSelectionBtn.addEventListener('click', clearAllSelections);
+undoSelectionBtn.addEventListener('click', () => {
+    if (selections.length > 0) {
+        selections.pop();
+        redrawMaskFromSelections();
+    }
+});
+clearSelectedColorBtn.addEventListener('click', clearSelectedColor);
+resetNewColorBtn.addEventListener('click', () => syncColorInputs(DEFAULT_NEW_COLOR, 'hex'));
 
 function getCanvasPos(e) {
     const rect = selectionCanvas.getBoundingClientRect();
@@ -107,100 +124,139 @@ function getCanvasPos(e) {
 
 selectionCanvas.addEventListener('mousedown', (e) => {
     if (!isImageLoaded) return;
-    isDrawing = true;
     const startPos = getCanvasPos(e);
+    let hasMoved = false;
     currentPath = [startPos];
+    isInteracting = true;
 
-    function onMouseMove(moveEvent) {
-        if (!isDrawing) return;
-        const currentPos = getCanvasPos(moveEvent);
-        currentPath.push(currentPos);
-        drawTemporarySelection();
-    }
-
-    function onMouseUp() {
-        if (currentPath.length <= 1 && currentTool === 'none') {
-            const { r, g, b } = getColorAtCursor(e, canvas, ctx);
-            selectedColor = { r, g, b };
-            updateSelectedColorUI();
-        } else if (currentPath.length > 1) {
-            commitCurrentPathToMask();
+    const onMouseMove = (moveEvent) => {
+        if (!isInteracting) return;
+        if (!hasMoved && Math.hypot(moveEvent.clientX - e.clientX, moveEvent.clientY - e.clientY) > 5) {
+            hasMoved = true;
         }
-        isDrawing = false;
-        currentPath = [];
-        drawSelectionBoundaries();
-        updateButtonStates();
+        if (hasMoved && currentTool !== 'none') {
+            currentPath.push(getCanvasPos(moveEvent));
+        }
+    };
+
+    const onMouseUp = (upEvent) => {
         window.removeEventListener('mousemove', onMouseMove);
         window.removeEventListener('mouseup', onMouseUp);
-    }
+
+        if (!hasMoved && currentTool === 'none') {
+            const { r, g, b } = getColorAtCursor(upEvent, canvas, ctx);
+            selectedColor = { r, g, b };
+            updateSelectedColorUI();
+        } else if (hasMoved && currentTool !== 'none') {
+            commitCurrentPathToSelections();
+            redrawMaskFromSelections();
+        }
+        
+        isInteracting = false;
+        currentPath = [];
+        updateButtonStates();
+    };
+    
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
 });
 
-function drawTemporarySelection() {
-    drawSelectionBoundaries(); // Redraw persistent boundaries
-    selectionCtx.strokeStyle = 'rgba(0, 123, 255, 0.7)'; // Use a different color for live drawing
-    selectionCtx.lineWidth = 2;
-    selectionCtx.setLineDash([]); // Solid line for temporary drawing
-
-    if (currentTool === 'rect' && currentPath.length > 1) {
+function commitCurrentPathToSelections() {
+    if (currentTool === 'rect') {
         const start = currentPath[0];
         const end = currentPath[currentPath.length - 1];
-        selectionCtx.strokeRect(start.x, start.y, end.x - start.x, end.y - start.y);
-    } else if (currentTool === 'lasso' && currentPath.length > 1) {
-        selectionCtx.beginPath();
-        selectionCtx.moveTo(currentPath[0].x, currentPath[0].y);
-        for (let i = 1; i < currentPath.length; i++) {
-            selectionCtx.lineTo(currentPath[i].x, currentPath[i].y);
-        }
-        selectionCtx.stroke();
+        selections.push({
+            type: 'rect',
+            x: Math.min(start.x, end.x),
+            y: Math.min(start.y, end.y),
+            w: Math.abs(start.x - end.x),
+            h: Math.abs(start.y - end.y),
+        });
+    } else if (currentTool === 'lasso') {
+        selections.push({ type: 'polygon', points: [...currentPath] });
     }
 }
 
-function commitCurrentPathToMask() {
-    maskCtx.fillStyle = 'white';
-    maskCtx.beginPath();
-    if (currentTool === 'rect' && currentPath.length > 1) {
-        const start = currentPath[0];
-        const end = currentPath[currentPath.length - 1];
-        maskCtx.rect(start.x, start.y, end.x - start.x, end.y - start.y);
-    } else if (currentTool === 'lasso' && currentPath.length > 1) {
-        maskCtx.moveTo(currentPath[0].x, currentPath[0].y);
-        for (let i = 1; i < currentPath.length; i++) {
-            maskCtx.lineTo(currentPath[i].x, currentPath[i].y);
-        }
-        maskCtx.closePath();
+function redrawMaskFromSelections() {
+    maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+    if (selections.length > 0) {
+        maskCtx.fillStyle = 'white';
+        selections.forEach(sel => {
+            maskCtx.beginPath();
+            if (sel.type === 'rect') {
+                maskCtx.rect(sel.x, sel.y, sel.w, sel.h);
+            } else if (sel.type === 'polygon') {
+                maskCtx.moveTo(sel.points[0].x, sel.points[0].y);
+                for (let i = 1; i < sel.points.length; i++) {
+                    maskCtx.lineTo(sel.points[i].x, sel.points[i].y);
+                }
+                maskCtx.closePath();
+            }
+            maskCtx.fill();
+        });
     }
-    maskCtx.fill();
+    updateButtonStates();
 }
 
-function drawSelectionBoundaries() {
-    selectionCtx.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
-    if (maskCanvas.getContext('2d').getImageData(0, 0, 1, 1).data[3] === 0) return; // Quick check if mask is empty
-    
-    // Create a temporary canvas to draw the boundary from the mask
-    const tempCanvas = document.createElement('canvas');
-    const tempCtx = tempCanvas.getContext('2d');
-    tempCanvas.width = canvas.width;
-    tempCanvas.height = canvas.height;
-    
-    // Draw the mask onto the temp canvas
-    tempCtx.drawImage(maskCanvas, 0, 0);
-
-    // Use globalCompositeOperation to "trace" the edge
-    tempCtx.globalCompositeOperation = 'source-in';
-    tempCtx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-    tempCtx.lineWidth = 4;
-    tempCtx.setLineDash([8, 8]);
-    tempCtx.strokeRect(0, 0, canvas.width, canvas.height);
-
-    // Draw the result back to the visible selection canvas
-    selectionCtx.drawImage(tempCanvas, 0, 0);
+function animateSelectionBoundaries() {
+    let offset = 0;
+    function march() {
+        selectionCtx.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
+        
+        const hasSelections = selections.length > 0;
+        if (hasSelections) {
+            // Draw white dashed line
+            selectionCtx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+            selectionCtx.lineWidth = 1;
+            selectionCtx.setLineDash([4, 4]);
+            selectionCtx.lineDashOffset = -offset;
+            selectionCtx.beginPath();
+            selections.forEach(sel => {
+                if (sel.type === 'rect') {
+                    selectionCtx.rect(sel.x, sel.y, sel.w, sel.h);
+                } else if (sel.type === 'polygon') {
+                    selectionCtx.moveTo(sel.points[0].x, sel.points[0].y);
+                    for (let i = 1; i < sel.points.length; i++) {
+                        selectionCtx.lineTo(sel.points[i].x, sel.points[i].y);
+                    }
+                    selectionCtx.closePath();
+                }
+            });
+            selectionCtx.stroke();
+            
+            // Draw black dashed line (offset)
+            selectionCtx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+            selectionCtx.lineDashOffset = -offset + 4;
+            selectionCtx.stroke(); // Stroke the same path again
+        }
+        
+        if (isInteracting && currentPath.length > 1 && currentTool !== 'none') {
+            selectionCtx.strokeStyle = 'rgba(0, 123, 255, 0.9)';
+            selectionCtx.setLineDash([]);
+            selectionCtx.beginPath();
+            if (currentTool === 'rect') {
+                const start = currentPath[0];
+                const end = currentPath[currentPath.length - 1];
+                selectionCtx.rect(start.x, start.y, end.x - start.x, end.y - start.y);
+            } else if (currentTool === 'lasso') {
+                selectionCtx.moveTo(currentPath[0].x, currentPath[0].y);
+                for (let i = 1; i < currentPath.length; i++) {
+                    selectionCtx.lineTo(currentPath[i].x, currentPath[i].y);
+                }
+            }
+            selectionCtx.stroke();
+        }
+        
+        offset = (offset + 1) % 8;
+        animationFrameId = requestAnimationFrame(march);
+    }
+    cancelAnimationFrame(animationFrameId);
+    march();
 }
 
 function clearAllSelections() {
+    selections = [];
     maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
-    drawSelectionBoundaries();
     updateButtonStates();
 }
 
@@ -211,7 +267,7 @@ function replaceColor(colorToReplace, saveToHistory) {
     const newImageData = new ImageData(new Uint8ClampedArray(sourceImageData.data), sourceImageData.width, sourceImageData.height);
     const data = newImageData.data;
     const maskData = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height).data;
-    const hasSelection = maskData.some(a => a > 0);
+    const hasSelection = selections.length > 0;
 
     const newColorRgb = hexToRgb(colorPicker.value);
     const tolerance = toleranceSlider.value;
@@ -221,7 +277,7 @@ function replaceColor(colorToReplace, saveToHistory) {
 
     for (let i = 0; i < data.length; i += 4) {
         if (hasSelection && maskData[i + 3] === 0) {
-            continue; // Skip pixel if there's a selection and this pixel isn't in it
+            continue;
         }
 
         const r = sourceImageData.data[i], g = sourceImageData.data[i + 1], b = sourceImageData.data[i + 2];
@@ -245,15 +301,14 @@ function replaceColor(colorToReplace, saveToHistory) {
     }
 }
 
-// --- All other functions remain the same ---
-// (Paste of full, working functions below for completeness)
+// --- Event Listeners and UI Updates ---
 replaceBtn.addEventListener('click', () => {
     if (!selectedColor) return;
     lastConfirmedColorToReplace = selectedColor;
     replaceColor(lastConfirmedColorToReplace, true);
 });
 toleranceSlider.addEventListener('input', () => {
-    toleranceValue.textContent = `${toleranceSlider.value}`;
+    toleranceValue.textContent = `Tolerance: ${toleranceSlider.value}`;
     if (!lastConfirmedColorToReplace) return;
     clearTimeout(previewTimeout);
     previewTimeout = setTimeout(() => {
@@ -265,7 +320,7 @@ undoBtn.addEventListener('click', () => {
         history.pop();
         lastConfirmedColorToReplace = null;
         ctx.putImageData(history[history.length - 1], 0, 0);
-        clearAllSelections(); // Selections are tied to a specific history state
+        clearAllSelections();
         updateButtonStates();
     }
 });
@@ -310,8 +365,13 @@ function updateButtonStates() {
     replaceBtn.disabled = !selectedColor || !isImageLoaded;
     downloadBtn.disabled = history.length <= 1;
     undoBtn.disabled = history.length <= 1;
-    const hasSelection = maskCanvas.getContext('2d').getImageData(0, 0, 1, 1).data[3] > 0 || maskCanvas.getContext('2d').getImageData(maskCanvas.width - 1, maskCanvas.height - 1, 1, 1).data[3] > 0;
-    clearSelectionBtn.disabled = !hasSelection;
+    clearSelectionBtn.disabled = selections.length === 0;
+    undoSelectionBtn.disabled = selections.length === 0;
+}
+function clearSelectedColor() {
+    selectedColor = null;
+    lastConfirmedColorToReplace = null;
+    updateSelectedColorUI();
 }
 function updateSelectedColorUI() {
     if (selectedColor) {
@@ -324,6 +384,7 @@ function updateSelectedColorUI() {
         selectedHex.textContent = 'HEX: --';
         selectedRgb.textContent = 'RGB: --, --, --';
     }
+    updateButtonStates();
 }
 function resetPaletteSelectionUI() {
     paletteSelectionSwatch.style.backgroundColor = '#f0f0f0';
@@ -331,19 +392,39 @@ function resetPaletteSelectionUI() {
     paletteSelectionRgb.textContent = 'RGB: --, --, --';
 }
 selectionCanvas.addEventListener('mousemove', (e) => {
-    if (!isImageLoaded || isDrawing) return;
+    if (!isImageLoaded || isInteracting) return;
     const { r, g, b } = getColorAtCursor(e, canvas, ctx);
     updatePreviewTooltip(e, r, g, b);
 });
 selectionCanvas.addEventListener('mouseleave', () => { colorPreview.style.display = 'none'; });
+
 function updatePreviewTooltip(e, r, g, b) {
+    if (selectedColor) {
+        colorPreview.style.display = 'none';
+        return;
+    }
     const hex = rgbToHex(r, g, b);
     previewSwatch.style.backgroundColor = hex;
     previewHex.textContent = hex;
     previewRgb.textContent = `RGB(${r}, ${g}, ${b})`;
-    colorPreview.style.left = `${e.pageX + 15}px`;
-    colorPreview.style.top = `${e.pageY + 15}px`;
-    colorPreview.style.display = 'flex';
+
+    const tooltip = colorPreview;
+    const offsetX = 20;
+    const offsetY = 20;
+
+    tooltip.style.display = 'flex'; 
+    const tooltipRect = tooltip.getBoundingClientRect();
+    
+    let x = e.clientX + offsetX;
+    let y = e.clientY + offsetY;
+
+    if (x + tooltipRect.width > window.innerWidth) { x = e.clientX - tooltipRect.width - offsetX; }
+    if (y + tooltipRect.height > window.innerHeight) { y = e.clientY - tooltipRect.height - offsetY; }
+    if (x < 0) x = offsetX;
+    if (y < 0) y = offsetY;
+    
+    tooltip.style.left = `${x}px`;
+    tooltip.style.top = `${y}px`;
 }
 colorPicker.addEventListener('input', () => syncColorInputs(colorPicker.value, 'picker'));
 hexInput.addEventListener('input', () => syncColorInputs(hexInput.value, 'hex'));
@@ -434,6 +515,8 @@ function hslToRgb(h, s, l) {
 }
 
 // --- INITIALIZE ---
-syncColorInputs(colorPicker.value, 'picker');
+syncColorInputs(DEFAULT_NEW_COLOR, 'hex');
 resetPaletteSelectionUI();
 updateButtonStates();
+animateSelectionBoundaries();
+selectionCanvas.className = 'cursor-eyedropper';
