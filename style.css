@@ -34,8 +34,10 @@ h2 { font-size: 1.1em; margin: 0 0 10px 0; color: #555; border-bottom: 1px solid
 /* Main layout */
 .main-content { display: flex; flex-wrap: wrap; gap: 30px; }
 .controls { flex: 1; min-width: 320px; display: flex; flex-direction: column; gap: 15px; }
-.canvas-container { flex: 2; min-width: 400px; border: 2px dashed #ccc; border-radius: 8px; display: flex; justify-content: center; align-items: center; position: relative; min-height: 300px; background-color: #fafafa; }
-#canvas { max-width: 100%; max-height: 75vh; cursor: pointer; }
+.canvas-container { flex: 2; min-width: 400px; border: 2px dashed #ccc; border-radius: 8px; display: flex; justify-content: center; align-items: center; position: relative; min-height: 300px; background-color: #fafafa; overflow: hidden; }
+#canvas, #selectionCanvas { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); max-width: 100%; max-height: 100%; }
+#selectionCanvas { cursor: crosshair; z-index: 5; }
+#canvas { pointer-events: none; }
 #placeholder-text { position: absolute; color: #888; }
 
 /* Color Preview Tooltip */
@@ -55,6 +57,9 @@ input[type="file"] { display: none; }
 .text-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
 .text-inputs input { width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 4px; text-align: center; box-sizing: border-box; }
 input[type="color"] { width: 40px; height: 40px; border: none; padding: 0; border-radius: 8px; cursor: pointer; }
+
+/* Area Selection Section */
+#clear-selection-btn { width: 100%; padding: 8px; margin-top: 10px; background-color: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer; }
 
 /* Tolerance Slider */
 .tolerance-section input { width: 100%; }
@@ -82,11 +87,8 @@ button:disabled { background: #e9ecef; color: #6c757d; cursor: not-allowed; }
 .color-display-box { margin-top: 15px; padding: 10px; background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; }
 .color-display-box h4 { margin: 0 0 10px 0; font-size: 0.9em; color: #6c757d; font-weight: normal; }
 
-/* Mode Toggle Switch Section */
-.mode-section {
-    padding-top: 15px;
-    border-top: 1px solid #eee;
-}
+/* Mode & Area Toggle Switch Section */
+.mode-section, .area-selection-section { padding-top: 15px; border-top: 1px solid #eee; }
 .toggle-switch-container { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; }
 .toggle-switch-container span { font-size: 0.9em; color: #555; }
 .toggle-switch { position: relative; display: inline-block; width: 60px; height: 34px; }

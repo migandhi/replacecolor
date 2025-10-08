@@ -2,6 +2,8 @@
 const imageLoader = document.getElementById('imageLoader');
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
+const selectionCanvas = document.getElementById('selectionCanvas');
+const selectionCtx = selectionCanvas.getContext('2d');
 const placeholderText = document.getElementById('placeholder-text');
 const colorPreview = document.getElementById('color-preview');
 const previewSwatch = document.getElementById('preview-swatch');
@@ -30,6 +32,8 @@ const downloadBtn = document.getElementById('downloadBtn');
 const toleranceSlider = document.getElementById('toleranceSlider');
 const toleranceValue = document.getElementById('toleranceValue');
 const modeToggle = document.getElementById('mode-toggle');
+const limitToSelectionToggle = document.getElementById('limit-to-selection-toggle');
+const clearSelectionBtn = document.getElementById('clear-selection-btn');
 const downloadOverlay = document.getElementById('download-overlay');
 const progressText = document.getElementById('progress-text');
 const progressBarFill = document.getElementById('progress-bar-fill');
@@ -41,6 +45,8 @@ let history = [];
 let selectedColor = null;
 let lastConfirmedColorToReplace = null;
 let previewTimeout;
+let isSelecting = false;
+let selectionRect = null;
 
 // --- Image Loading ---
 imageLoader.addEventListener('change', e => loadImage(e, true));
@@ -54,9 +60,12 @@ function loadImage(e, isMainImage) {
             if (isMainImage) {
                 canvas.width = img.width;
                 canvas.height = img.height;
+                selectionCanvas.width = img.width;
+                selectionCanvas.height = img.height;
                 ctx.drawImage(img, 0, 0);
                 placeholderText.style.display = 'none';
                 history = [ctx.getImageData(0, 0, canvas.width, canvas.height)];
+                clearSelection();
                 selectedColor = null;
                 lastConfirmedColorToReplace = null;
                 isImageLoaded = true;
@@ -75,32 +84,120 @@ function loadImage(e, isMainImage) {
     reader.readAsDataURL(e.target.files[0]);
 }
 
-// --- Tab Switching ---
-tabButtons.forEach(button => {
-    button.addEventListener('click', () => {
-        tabButtons.forEach(btn => btn.classList.remove('active'));
-        button.classList.add('active');
-        tabContents.forEach(content => content.classList.remove('active'));
-        document.getElementById(button.dataset.tab).classList.add('active');
-    });
+// --- Area Selection Logic ---
+function getSelectionPos(e) {
+    const rect = selectionCanvas.getBoundingClientRect();
+    const scaleX = selectionCanvas.width / rect.width;
+    const scaleY = selectionCanvas.height / rect.height;
+    return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+}
+
+selectionCanvas.addEventListener('mousedown', (e) => {
+    if (!isImageLoaded) return;
+    const startPos = getSelectionPos(e);
+    let moved = false;
+
+    function onMouseMove(moveEvent) {
+        if (!isSelecting) {
+            const currentPos = getSelectionPos(moveEvent);
+            // Start selecting only if the mouse has moved a small distance
+            if (Math.abs(currentPos.x - startPos.x) > 5 || Math.abs(currentPos.y - startPos.y) > 5) {
+                isSelecting = true;
+                moved = true;
+                selectionRect = { startX: startPos.x, startY: startPos.y, endX: currentPos.x, endY: currentPos.y };
+            }
+        }
+        if (isSelecting) {
+            const currentPos = getSelectionPos(moveEvent);
+            selectionRect.endX = currentPos.x;
+            selectionRect.endY = currentPos.y;
+            drawSelectionRect();
+        }
+    }
+
+    function onMouseUp(upEvent) {
+        if (!moved) { // It was a click, not a drag
+            const { r, g, b } = getColorAtCursor(upEvent, canvas, ctx);
+            selectedColor = { r, g, b };
+            updateSelectedColorUI();
+        } else { // It was a drag
+            limitToSelectionToggle.checked = true;
+        }
+        isSelecting = false;
+        updateButtonStates();
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('mouseup', onMouseUp);
+    }
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
 });
 
-// --- Color Selection & Replacement ---
-canvas.addEventListener('click', e => {
-    if (isImageLoaded) {
-        const { r, g, b } = getColorAtCursor(e, canvas, ctx);
-        selectedColor = { r, g, b };
-        updateSelectedColorUI();
+clearSelectionBtn.addEventListener('click', clearSelection);
+
+function drawSelectionRect() {
+    selectionCtx.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
+    if (!selectionRect) return;
+    selectionCtx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+    selectionCtx.lineWidth = 2;
+    selectionCtx.setLineDash([5, 5]);
+    const width = selectionRect.endX - selectionRect.startX;
+    const height = selectionRect.endY - selectionRect.startY;
+    selectionCtx.strokeRect(selectionRect.startX, selectionRect.startY, width, height);
+}
+function clearSelection() {
+    selectionRect = null;
+    limitToSelectionToggle.checked = false;
+    selectionCtx.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
+    updateButtonStates();
+}
+
+// --- Main Replacement Function ---
+function replaceColor(colorToReplace, saveToHistory) {
+    if (!isImageLoaded || !colorToReplace) return;
+    const sourceImageData = history[history.length - 1];
+    const newImageData = new ImageData(new Uint8ClampedArray(sourceImageData.data), sourceImageData.width, sourceImageData.height);
+    const data = newImageData.data;
+    const newColorRgb = hexToRgb(colorPicker.value);
+    const tolerance = toleranceSlider.value;
+    const isAdvancedMode = modeToggle.checked;
+    const newColorHsl = isAdvancedMode ? rgbToHsl(newColorRgb.r, newColorRgb.g, newColorRgb.b) : null;
+    const targetLab = rgbToLab(colorToReplace.r, colorToReplace.g, colorToReplace.b);
+
+    let startX = 0, endX = canvas.width, startY = 0, endY = canvas.height;
+    if (limitToSelectionToggle.checked && selectionRect) {
+        startX = Math.floor(Math.min(selectionRect.startX, selectionRect.endX));
+        endX = Math.ceil(Math.max(selectionRect.startX, selectionRect.endX));
+        startY = Math.floor(Math.min(selectionRect.startY, selectionRect.endY));
+        endY = Math.ceil(Math.max(selectionRect.startY, selectionRect.endY));
+    }
+
+    for (let y = startY; y < endY; y++) {
+        for (let x = startX; x < endX; x++) {
+            const i = (y * canvas.width + x) * 4;
+            const r = sourceImageData.data[i], g = sourceImageData.data[i + 1], b = sourceImageData.data[i + 2];
+            const currentLab = rgbToLab(r, g, b);
+            const deltaE = Math.sqrt(Math.pow(currentLab[0] - targetLab[0], 2) + Math.pow(currentLab[1] - targetLab[1], 2) + Math.pow(currentLab[2] - targetLab[2], 2));
+
+            if (deltaE <= tolerance) {
+                if (isAdvancedMode) {
+                    const originalHsl = rgbToHsl(r, g, b);
+                    const finalRgb = hslToRgb(newColorHsl[0], newColorHsl[1], originalHsl[2]);
+                    data[i] = finalRgb[0]; data[i + 1] = finalRgb[1]; data[i + 2] = finalRgb[2];
+                } else {
+                    data[i] = newColorRgb.r; data[i + 1] = newColorRgb.g; data[i + 2] = newColorRgb.b;
+                }
+            }
+        }
+    }
+    ctx.putImageData(newImageData, 0, 0);
+    if (saveToHistory) {
+        history.push(newImageData);
         updateButtonStates();
     }
-});
-paletteCanvas.addEventListener('click', e => {
-    if (paletteCanvas.width > 0) {
-        const { r, g, b } = getColorAtCursor(e, paletteCanvas, paletteCtx);
-        const hex = rgbToHex(r, g, b);
-        syncColorInputs(hex, 'hex');
-    }
-});
+}
+
+// --- Event Listeners and UI Updates ---
 replaceBtn.addEventListener('click', () => {
     if (!selectedColor) return;
     lastConfirmedColorToReplace = selectedColor;
@@ -114,87 +211,6 @@ toleranceSlider.addEventListener('input', () => {
         replaceColor(lastConfirmedColorToReplace, false);
     }, 10);
 });
-
-// --- Main Replacement Function with Mode Switch ---
-function replaceColor(colorToReplace, saveToHistory) {
-    if (!isImageLoaded) return;
-    const sourceImageData = history[history.length - 1];
-    const newImageData = new ImageData(new Uint8ClampedArray(sourceImageData.data), sourceImageData.width, sourceImageData.height);
-    const data = newImageData.data;
-    const newColorRgb = hexToRgb(colorPicker.value);
-    const tolerance = toleranceSlider.value;
-    const targetLab = rgbToLab(colorToReplace.r, colorToReplace.g, colorToReplace.b);
-    const isAdvancedMode = modeToggle.checked;
-    const newColorHsl = isAdvancedMode ? rgbToHsl(newColorRgb.r, newColorRgb.g, newColorRgb.b) : null;
-
-    for (let i = 0; i < data.length; i += 4) {
-        const r = sourceImageData.data[i], g = sourceImageData.data[i + 1], b = sourceImageData.data[i + 2];
-        const currentLab = rgbToLab(r, g, b);
-        const deltaE = Math.sqrt(Math.pow(currentLab[0] - targetLab[0], 2) + Math.pow(currentLab[1] - targetLab[1], 2) + Math.pow(currentLab[2] - targetLab[2], 2));
-        
-        if (deltaE <= tolerance) {
-            if (isAdvancedMode) {
-                const originalHsl = rgbToHsl(r, g, b);
-                const finalRgb = hslToRgb(newColorHsl[0], newColorHsl[1], originalHsl[2]);
-                data[i] = finalRgb[0];
-                data[i + 1] = finalRgb[1];
-                data[i + 2] = finalRgb[2];
-            } else {
-                data[i] = newColorRgb.r;
-                data[i + 1] = newColorRgb.g;
-                data[i + 2] = newColorRgb.b;
-            }
-        }
-    }
-    ctx.putImageData(newImageData, 0, 0);
-    if (saveToHistory) {
-        history.push(newImageData);
-        updateButtonStates();
-    }
-}
-
-// --- Live Color Preview ---
-canvas.addEventListener('mousemove', e => {
-    if (isImageLoaded) {
-        const { r, g, b } = getColorAtCursor(e, canvas, ctx);
-        updatePreviewTooltip(e, r, g, b);
-    }
-});
-canvas.addEventListener('mouseout', () => { colorPreview.style.display = 'none'; });
-
-function updatePreviewTooltip(e, r, g, b) {
-    const hex = rgbToHex(r, g, b);
-    previewSwatch.style.backgroundColor = hex;
-    previewHex.textContent = hex;
-    previewRgb.textContent = `RGB(${r}, ${g}, ${b})`;
-    colorPreview.style.left = `${e.pageX + 15}px`;
-    colorPreview.style.top = `${e.pageY + 15}px`;
-    colorPreview.style.display = 'flex';
-}
-
-// --- UI Updates & Action Buttons ---
-function updateSelectedColorUI() {
-    if (selectedColor) {
-        const hex = rgbToHex(selectedColor.r, selectedColor.g, selectedColor.b);
-        selectedColorSwatch.style.backgroundColor = hex;
-        selectedHex.textContent = `HEX: ${hex}`;
-        selectedRgb.textContent = `RGB: ${selectedColor.r}, ${selectedColor.g}, ${selectedColor.b}`;
-    } else {
-        selectedColorSwatch.style.backgroundColor = '#f0f0f0';
-        selectedHex.textContent = 'HEX: --';
-        selectedRgb.textContent = 'RGB: --, --, --';
-    }
-}
-function updateButtonStates() {
-    replaceBtn.disabled = !selectedColor;
-    downloadBtn.disabled = history.length <= 1;
-    undoBtn.disabled = history.length <= 1;
-}
-function resetPaletteSelectionUI() {
-    paletteSelectionSwatch.style.backgroundColor = '#f0f0f0';
-    paletteSelectionHex.textContent = 'HEX: --';
-    paletteSelectionRgb.textContent = 'RGB: --, --, --';
-}
 undoBtn.addEventListener('click', () => {
     if (history.length > 1) {
         history.pop();
@@ -203,8 +219,6 @@ undoBtn.addEventListener('click', () => {
         updateButtonStates();
     }
 });
-
-// --- Download Logic with Progress Bar ---
 downloadBtn.addEventListener('click', () => {
     progressText.innerHTML = 'Preparing your image...';
     progressBarFill.style.width = '0%';
@@ -227,12 +241,63 @@ closeOverlayBtn.addEventListener('click', () => { downloadOverlay.style.display 
 downloadOverlay.addEventListener('click', (e) => {
     if (e.target === downloadOverlay) { downloadOverlay.style.display = 'none'; }
 });
-
-// --- Color Input Sync ---
+paletteCanvas.addEventListener('click', e => {
+    if (paletteCanvas.width > 0) {
+        const { r, g, b } = getColorAtCursor(e, paletteCanvas, paletteCtx);
+        const hex = rgbToHex(r, g, b);
+        syncColorInputs(hex, 'hex');
+    }
+});
+tabButtons.forEach(button => {
+    button.addEventListener('click', () => {
+        tabButtons.forEach(btn => btn.classList.remove('active'));
+        button.classList.add('active');
+        tabContents.forEach(content => content.classList.remove('active'));
+        document.getElementById(button.dataset.tab).classList.add('active');
+    });
+});
+function updateButtonStates() {
+    replaceBtn.disabled = !selectedColor || !isImageLoaded;
+    downloadBtn.disabled = history.length <= 1;
+    undoBtn.disabled = history.length <= 1;
+    clearSelectionBtn.disabled = !selectionRect;
+    limitToSelectionToggle.disabled = !selectionRect;
+}
+function updateSelectedColorUI() {
+    if (selectedColor) {
+        const hex = rgbToHex(selectedColor.r, selectedColor.g, selectedColor.b);
+        selectedColorSwatch.style.backgroundColor = hex;
+        selectedHex.textContent = `HEX: ${hex}`;
+        selectedRgb.textContent = `RGB: ${selectedColor.r}, ${selectedColor.g}, ${selectedColor.b}`;
+    } else {
+        selectedColorSwatch.style.backgroundColor = '#f0f0f0';
+        selectedHex.textContent = 'HEX: --';
+        selectedRgb.textContent = 'RGB: --, --, --';
+    }
+}
+function resetPaletteSelectionUI() {
+    paletteSelectionSwatch.style.backgroundColor = '#f0f0f0';
+    paletteSelectionHex.textContent = 'HEX: --';
+    paletteSelectionRgb.textContent = 'RGB: --, --, --';
+}
+selectionCanvas.addEventListener('mousemove', (e) => {
+    if (!isImageLoaded || isSelecting) return;
+    const { r, g, b } = getColorAtCursor(e, canvas, ctx);
+    updatePreviewTooltip(e, r, g, b);
+});
+selectionCanvas.addEventListener('mouseleave', () => { colorPreview.style.display = 'none'; });
+function updatePreviewTooltip(e, r, g, b) {
+    const hex = rgbToHex(r, g, b);
+    previewSwatch.style.backgroundColor = hex;
+    previewHex.textContent = hex;
+    previewRgb.textContent = `RGB(${r}, ${g}, ${b})`;
+    colorPreview.style.left = `${e.pageX + 15}px`;
+    colorPreview.style.top = `${e.pageY + 15}px`;
+    colorPreview.style.display = 'flex';
+}
 colorPicker.addEventListener('input', () => syncColorInputs(colorPicker.value, 'picker'));
 hexInput.addEventListener('input', () => syncColorInputs(hexInput.value, 'hex'));
 [rInput, gInput, bInput].forEach(input => input.addEventListener('input', () => syncColorInputs(null, 'rgb')));
-
 function syncColorInputs(color, source) {
     let r, g, b, hex;
     if (source === 'picker' || source === 'hex') {
@@ -323,3 +388,4 @@ function hslToRgb(h, s, l) {
 // --- INITIALIZE ---
 syncColorInputs(colorPicker.value, 'picker');
 resetPaletteSelectionUI();
+updateButtonStates();

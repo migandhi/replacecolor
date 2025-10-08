@@ -10,14 +10,14 @@
     <div class="container">
         <header>
             <h1>Advanced Image Color Replacer</h1>
-            <p>Select a color from your main image, then choose a new color manually or pick one from a second image.</p>
+            <p>Select a color to replace. Optionally, drag on the image to limit the replacement to a specific area.</p>
         </header>
 
         <div class="main-content">
             <div class="controls">
                 <!-- Step 1 & 2 -->
                 <div class="upload-section">
-                    <label for="imageLoader" class="upload-btn">1. Upload Main Image</label>
+                    <label for="imageLoader" class="upload-btn">1. Upload Image</label>
                     <input type="file" id="imageLoader" accept="image/*">
                 </div>
                 <div id="selected-color-section" class="color-box">
@@ -31,14 +31,13 @@
                     </div>
                 </div>
 
-                <!-- Step 3: Redesigned with Tabs -->
+                <!-- Step 3: New Color -->
                 <div class="color-selection color-box">
                     <h2>3. Choose New Color</h2>
                     <div class="tabs">
                         <button class="tab-button active" data-tab="tab-picker">Picker & Manual</button>
                         <button class="tab-button" data-tab="tab-image">From Image</button>
                     </div>
-                    <!-- Tab Content -->
                     <div id="tab-picker" class="tab-content active">
                         <div class="color-display">
                              <input type="color" id="colorPicker" value="#0099ff">
@@ -70,29 +69,41 @@
                     </div>
                 </div>
 
-                <!-- Step 4 -->
+                <!-- Step 4: Area Selection -->
+                <div class="area-selection-section color-box">
+                    <h2>4. Area (Optional: Drag on Image)</h2>
+                    <div class="toggle-switch-container">
+                        <span>Entire Image</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="limit-to-selection-toggle" disabled>
+                            <span class="slider"></span>
+                        </label>
+                        <span>Limit to Selection</span>
+                    </div>
+                    <button id="clear-selection-btn" disabled>Clear Selection</button>
+                </div>
+                
+                <!-- Step 5 & 6 -->
                 <div class="tolerance-section">
-                    <h2>4. Set Tolerance</h2>
+                    <h2>5. Set Tolerance</h2>
                     <input type="range" id="toleranceSlider" min="0" max="100" value="10">
                     <span id="toleranceValue">10</span>
                 </div>
-
-                <!-- NEW: Replacement Mode Switch -->
                 <div class="mode-section">
-                    <h2>Replacement Mode</h2>
+                    <h2>6. Replacement Mode</h2>
                     <div class="toggle-switch-container">
                         <span>Flat Color</span>
                         <label class="toggle-switch">
-                            <input type="checkbox" id="mode-toggle" checked> <!-- Default to Advanced -->
+                            <input type="checkbox" id="mode-toggle" checked>
                             <span class="slider"></span>
                         </label>
                         <span>Advanced (Natural)</span>
                     </div>
                 </div>
                 
-                <!-- Step 5 -->
+                <!-- Step 7 -->
                 <div class="actions">
-                    <button id="replaceBtn" class="action-btn" disabled>5. Replace Color</button>
+                    <button id="replaceBtn" class="action-btn" disabled>7. Replace Color</button>
                     <button id="undoBtn" disabled>Undo</button>
                     <button id="downloadBtn" disabled>Download</button>
                 </div>
@@ -100,6 +111,7 @@
 
             <div class="canvas-container">
                 <canvas id="canvas"></canvas>
+                <canvas id="selectionCanvas"></canvas>
                 <div id="placeholder-text">Your image will appear here</div>
                 <div id="color-preview" style="display: none;">
                     <div id="preview-swatch"></div>
@@ -109,7 +121,6 @@
         </div>
     </div>
 
-    <!-- Download Progress Overlay -->
     <div id="download-overlay">
         <div class="overlay-content">
             <h3 id="progress-text">Preparing your image...</h3>
@@ -119,7 +130,7 @@
             <button id="close-overlay-btn" style="display: none;">Close</button>
         </div>
     </div>
-
+    
     <script src="script.js"></script>
 </body>
 </html>
