@@ -29,6 +29,7 @@ const undoBtn = document.getElementById('undoBtn');
 const downloadBtn = document.getElementById('downloadBtn');
 const toleranceSlider = document.getElementById('toleranceSlider');
 const toleranceValue = document.getElementById('toleranceValue');
+const modeToggle = document.getElementById('mode-toggle');
 const downloadOverlay = document.getElementById('download-overlay');
 const progressText = document.getElementById('progress-text');
 const progressBarFill = document.getElementById('progress-bar-fill');
@@ -106,7 +107,7 @@ replaceBtn.addEventListener('click', () => {
     replaceColor(lastConfirmedColorToReplace, true);
 });
 toleranceSlider.addEventListener('input', () => {
-    toleranceValue.textContent = `${toleranceSlider.value}%`;
+    toleranceValue.textContent = `${toleranceSlider.value}`;
     if (!lastConfirmedColorToReplace) return;
     clearTimeout(previewTimeout);
     previewTimeout = setTimeout(() => {
@@ -114,26 +115,35 @@ toleranceSlider.addEventListener('input', () => {
     }, 10);
 });
 
-// --- Main Replacement Function ---
+// --- Main Replacement Function with Mode Switch ---
 function replaceColor(colorToReplace, saveToHistory) {
     if (!isImageLoaded) return;
     const sourceImageData = history[history.length - 1];
     const newImageData = new ImageData(new Uint8ClampedArray(sourceImageData.data), sourceImageData.width, sourceImageData.height);
     const data = newImageData.data;
     const newColorRgb = hexToRgb(colorPicker.value);
-    const newColorHsl = rgbToHsl(newColorRgb.r, newColorRgb.g, newColorRgb.b);
     const tolerance = toleranceSlider.value;
     const targetLab = rgbToLab(colorToReplace.r, colorToReplace.g, colorToReplace.b);
+    const isAdvancedMode = modeToggle.checked;
+    const newColorHsl = isAdvancedMode ? rgbToHsl(newColorRgb.r, newColorRgb.g, newColorRgb.b) : null;
+
     for (let i = 0; i < data.length; i += 4) {
         const r = sourceImageData.data[i], g = sourceImageData.data[i + 1], b = sourceImageData.data[i + 2];
         const currentLab = rgbToLab(r, g, b);
         const deltaE = Math.sqrt(Math.pow(currentLab[0] - targetLab[0], 2) + Math.pow(currentLab[1] - targetLab[1], 2) + Math.pow(currentLab[2] - targetLab[2], 2));
+        
         if (deltaE <= tolerance) {
-            const originalHsl = rgbToHsl(r, g, b);
-            const finalRgb = hslToRgb(newColorHsl[0], newColorHsl[1], originalHsl[2]);
-            data[i] = finalRgb[0];
-            data[i + 1] = finalRgb[1];
-            data[i + 2] = finalRgb[2];
+            if (isAdvancedMode) {
+                const originalHsl = rgbToHsl(r, g, b);
+                const finalRgb = hslToRgb(newColorHsl[0], newColorHsl[1], originalHsl[2]);
+                data[i] = finalRgb[0];
+                data[i + 1] = finalRgb[1];
+                data[i + 2] = finalRgb[2];
+            } else {
+                data[i] = newColorRgb.r;
+                data[i + 1] = newColorRgb.g;
+                data[i + 2] = newColorRgb.b;
+            }
         }
     }
     ctx.putImageData(newImageData, 0, 0);
@@ -218,7 +228,6 @@ downloadOverlay.addEventListener('click', (e) => {
     if (e.target === downloadOverlay) { downloadOverlay.style.display = 'none'; }
 });
 
-
 // --- Color Input Sync ---
 colorPicker.addEventListener('input', () => syncColorInputs(colorPicker.value, 'picker'));
 hexInput.addEventListener('input', () => syncColorInputs(hexInput.value, 'hex'));
@@ -232,7 +241,7 @@ function syncColorInputs(color, source) {
         ({ r, g, b } = hexToRgb(hex));
     } else if (source === 'rgb') {
         r = parseInt(rInput.value); g = parseInt(gInput.value); b = parseInt(bInput.value);
-        if (isNaN(r) || isNaN(g) || isNaN(b) || r > 255 || g > 255 || b > 255) return;
+        if (isNaN(r) || isNaN(g) || isNaN(b) || r > 255 || g > 255 || b > 255 || r < 0 || g < 0 || b < 0) return;
         hex = rgbToHex(r, g, b);
     }
     if (source !== 'picker') colorPicker.value = hex;

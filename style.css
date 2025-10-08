@@ -82,29 +82,24 @@ button:disabled { background: #e9ecef; color: #6c757d; cursor: not-allowed; }
 .color-display-box { margin-top: 15px; padding: 10px; background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; }
 .color-display-box h4 { margin: 0 0 10px 0; font-size: 0.9em; color: #6c757d; font-weight: normal; }
 
+/* Mode Toggle Switch Section */
+.mode-section {
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+}
+.toggle-switch-container { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; }
+.toggle-switch-container span { font-size: 0.9em; color: #555; }
+.toggle-switch { position: relative; display: inline-block; width: 60px; height: 34px; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
+.slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+input:checked + .slider { background-color: #007bff; }
+input:focus + .slider { box-shadow: 0 0 1px #007bff; }
+input:checked + .slider:before { transform: translateX(26px); }
+
 /* Download Progress Overlay */
-#download-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.6);
-    display: none; /* Hidden by default */
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-    backdrop-filter: blur(5px);
-}
-.overlay-content {
-    background-color: #fff;
-    padding: 30px;
-    border-radius: 12px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-    text-align: center;
-    width: 90%;
-    max-width: 400px;
-}
+#download-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.6); display: none; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(5px); }
+.overlay-content { background-color: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); text-align: center; width: 90%; max-width: 400px; }
 #progress-text { margin: 0 0 15px 0; color: #333; }
 .progress-bar-container { width: 100%; background-color: #e9ecef; border-radius: 20px; height: 20px; overflow: hidden; margin-bottom: 20px; }
 #progress-bar-fill { height: 100%; width: 0%; background-color: #007bff; border-radius: 20px; transition: width 1.5s ease-in-out; }

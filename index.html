@@ -70,12 +70,27 @@
                     </div>
                 </div>
 
-                <!-- Step 4 & 5 -->
+                <!-- Step 4 -->
                 <div class="tolerance-section">
-                    <h2>4. Set Tolerance (%)</h2>
+                    <h2>4. Set Tolerance</h2>
                     <input type="range" id="toleranceSlider" min="0" max="100" value="10">
-                    <span id="toleranceValue">10%</span>
+                    <span id="toleranceValue">10</span>
                 </div>
+
+                <!-- NEW: Replacement Mode Switch -->
+                <div class="mode-section">
+                    <h2>Replacement Mode</h2>
+                    <div class="toggle-switch-container">
+                        <span>Flat Color</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="mode-toggle" checked> <!-- Default to Advanced -->
+                            <span class="slider"></span>
+                        </label>
+                        <span>Advanced (Natural)</span>
+                    </div>
+                </div>
+                
+                <!-- Step 5 -->
                 <div class="actions">
                     <button id="replaceBtn" class="action-btn" disabled>5. Replace Color</button>
                     <button id="undoBtn" disabled>Undo</button>
