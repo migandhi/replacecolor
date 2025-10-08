@@ -28,7 +28,7 @@ const paletteSelectionHex = document.getElementById('palette-selection-hex');
 const paletteSelectionRgb = document.getElementById('palette-selection-rgb');
 const tabButtons = document.querySelectorAll('.tab-button');
 const tabContents = document.querySelectorAll('.tab-content');
-const replaceBtn = document.getElementById('replaceBtn');
+const commitBtn = document.getElementById('commitBtn');
 const undoBtn = document.getElementById('undoBtn');
 const downloadBtn = document.getElementById('downloadBtn');
 const toleranceSlider = document.getElementById('toleranceSlider');
@@ -112,7 +112,12 @@ undoSelectionBtn.addEventListener('click', () => {
         redrawMaskFromSelections();
     }
 });
-clearSelectedColorBtn.addEventListener('click', clearSelectedColor);
+clearSelectedColorBtn.addEventListener('click', () => {
+    clearSelectedColor();
+    if (history.length > 0) {
+        ctx.putImageData(history[history.length - 1], 0, 0);
+    }
+});
 resetNewColorBtn.addEventListener('click', () => syncColorInputs(DEFAULT_NEW_COLOR, 'hex'));
 
 function getCanvasPos(e) {
@@ -147,6 +152,7 @@ selectionCanvas.addEventListener('mousedown', (e) => {
             const { r, g, b } = getColorAtCursor(upEvent, canvas, ctx);
             selectedColor = { r, g, b };
             updateSelectedColorUI();
+            replaceColor(selectedColor, false);
         } else if (hasMoved && currentTool !== 'none') {
             commitCurrentPathToSelections();
             redrawMaskFromSelections();
@@ -229,7 +235,7 @@ function animateSelectionBoundaries() {
         }
         
         if (isInteracting && currentPath.length > 1 && currentTool !== 'none') {
-            selectionCtx.strokeStyle = 'rgba(0, 123, 255, 0.9)';
+            selectionCtx.strokeStyle = 'rgba(79, 70, 229, 0.9)';
             selectionCtx.setLineDash([]);
             selectionCtx.beginPath();
             if (currentTool === 'rect') {
@@ -300,19 +306,17 @@ function replaceColor(colorToReplace, saveToHistory) {
 }
 
 // --- Event Listeners and UI Updates ---
-replaceBtn.addEventListener('click', () => {
+commitBtn.addEventListener('click', () => {
     if (!selectedColor) return;
     lastConfirmedColorToReplace = selectedColor;
     replaceColor(lastConfirmedColorToReplace, true);
-    clearSelectedColor(); 
-    document.getElementById('tool-none').click();
 });
 toleranceSlider.addEventListener('input', () => {
     toleranceValue.textContent = `Tolerance: ${toleranceSlider.value}`;
-    if (!lastConfirmedColorToReplace) return;
+    if (!selectedColor) return;
     clearTimeout(previewTimeout);
     previewTimeout = setTimeout(() => {
-        replaceColor(lastConfirmedColorToReplace, false);
+        replaceColor(selectedColor, false);
     }, 10);
 });
 undoBtn.addEventListener('click', () => {
@@ -337,8 +341,8 @@ downloadBtn.addEventListener('click', () => {
         link.href = image;
         setTimeout(() => {
             link.click();
-            progressText.innerHTML = `✅ Download Started!<br><small>Please check your browser's 'Downloads' folder.</small>`;
-            closeOverlayBtn.style.display = 'block';
+            progressText.innerHTML = `✅ Download Started!<br><small>Check your browser's 'Downloads' folder.</small>`;
+            closeOverlayBtn.style.display = 'inline-block';
         }, 1500);
     }, 100);
 });
@@ -362,7 +366,7 @@ tabButtons.forEach(button => {
     });
 });
 function updateButtonStates() {
-    replaceBtn.disabled = !selectedColor || !isImageLoaded;
+    commitBtn.disabled = !selectedColor || !isImageLoaded;
     downloadBtn.disabled = history.length <= 1;
     undoBtn.disabled = history.length <= 1;
     clearSelectionBtn.disabled = selections.length === 0;
@@ -513,6 +517,64 @@ function hslToRgb(h, s, l) {
     }
     return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
 }
+
+// --- HELP MODAL LOGIC ---
+const helpModal = document.getElementById('help-modal');
+const helpBtn = document.getElementById('help-btn');
+const helpCloseBtn = document.getElementById('help-close-btn');
+const controlBoxes = document.querySelectorAll('.control-box');
+let currentHelpTopic = 'introduction'; // Default topic
+
+// Function to open the help modal and scroll to the current topic
+const openHelpModal = () => {
+    helpModal.classList.remove('hidden');
+    const topicElement = document.getElementById(`help-topic-${currentHelpTopic}`);
+    if (topicElement) {
+        topicElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        topicElement.classList.add('topic-highlight');
+        setTimeout(() => {
+            topicElement.classList.remove('topic-highlight');
+        }, 2000);
+    }
+};
+
+// Function to close the help modal
+const closeHelpModal = () => {
+    helpModal.classList.add('hidden');
+};
+
+// Listen for interactions on control boxes to set the current help topic
+controlBoxes.forEach(box => {
+    box.addEventListener('focusin', () => { // 'focusin' captures focus on any child element
+        currentHelpTopic = box.dataset.helpTopic;
+    });
+     box.addEventListener('click', () => {
+        currentHelpTopic = box.dataset.helpTopic;
+    });
+});
+
+// Listen for the '?' key press to open the modal
+document.addEventListener('keydown', (e) => {
+    if (e.key === '?') {
+        // Avoid typing '?' in input fields
+        if (e.target.tagName !== 'INPUT') {
+            e.preventDefault();
+            openHelpModal();
+        }
+    }
+    if (e.key === 'Escape') {
+        closeHelpModal();
+    }
+});
+
+helpBtn.addEventListener('click', openHelpModal);
+helpCloseBtn.addEventListener('click', closeHelpModal);
+helpModal.addEventListener('click', (e) => {
+    if (e.target === helpModal) { // Close if clicking on the overlay backdrop
+        closeHelpModal();
+    }
+});
+
 
 // --- INITIALIZE ---
 syncColorInputs(DEFAULT_NEW_COLOR, 'hex');

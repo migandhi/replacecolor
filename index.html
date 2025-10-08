@@ -10,20 +10,25 @@
     <div class="container">
         <header>
             <h1>Advanced Image Color Replacer</h1>
-            <p>Select a color, choose a selection tool, and replace color only where you want it.</p>
+            <p>A professional tool to intelligently replace colors in any image.</p>
+            <button id="help-btn" class="btn btn-tertiary">Help (?)</button>
         </header>
 
-        <div class="main-content">
+        <main class="main-content">
             <div class="controls">
-                <!-- Step 1 & 2 -->
-                <div class="upload-section">
-                    <label for="imageLoader" class="upload-btn">1. Upload Image</label>
+                <!-- Step 1: Upload -->
+                <div class="control-box" data-help-topic="upload">
+                    <h2>Step 1: Upload Your Image</h2>
+                    <label for="imageLoader" class="btn btn-primary">Upload Image</label>
                     <input type="file" id="imageLoader" accept="image/*">
                 </div>
-                <div id="selected-color-section" class="color-box">
+
+                <!-- Step 2: Select Original Color -->
+                <div id="selected-color-section" class="control-box" data-help-topic="pick-color">
                     <div class="header-with-button">
-                        <h2>2. Color to Replace (Click Image)</h2>
-                        <button id="clear-selected-color-btn" class="clear-btn" title="Clear Selected Color">×</button>
+                        <h2>Step 2: Pick Original Color</h2>
+                        <p>Use the eyedropper to click on the color you want to replace in the image.</p>
+                        <button id="clear-selected-color-btn" class="btn-icon" title="Clear Selected Color">×</button>
                     </div>
                     <div class="color-display">
                         <div id="selected-color-swatch" class="color-swatch"></div>
@@ -34,11 +39,12 @@
                     </div>
                 </div>
 
-                <!-- Step 3: New Color -->
-                <div class="color-selection color-box">
+                <!-- Step 3: Choose New Color -->
+                <div class="control-box" data-help-topic="new-color">
                     <div class="header-with-button">
-                        <h2>3. Choose New Color</h2>
-                        <button id="reset-new-color-btn" class="clear-btn" title="Reset to Default Color">⟳</button>
+                        <h2>Step 3: Choose New Color</h2>
+                        <p>Select the color you want to use for the replacement.</p>
+                        <button id="reset-new-color-btn" class="btn-icon" title="Reset to Default Color">⟳</button>
                     </div>
                     <div class="tabs">
                         <button class="tab-button active" data-tab="tab-picker">Picker & Manual</button>
@@ -56,7 +62,7 @@
                         </div>
                     </div>
                     <div id="tab-image" class="tab-content">
-                        <label for="paletteImageLoader" class="upload-btn-secondary">Upload Palette Image</label>
+                        <label for="paletteImageLoader" class="btn btn-secondary">Upload Palette Image</label>
                         <input type="file" id="paletteImageLoader" accept="image/*">
                         <div class="palette-canvas-container">
                             <canvas id="paletteCanvas"></canvas>
@@ -75,35 +81,40 @@
                     </div>
                 </div>
 
-                <!-- Step 4: Selection Tool -->
-                <div class="selection-tool-section color-box">
-                    <h2>4. Selection Tool</h2>
-                    <div class="tool-group">
-                        <button class="tool-btn active" id="tool-none" title="Eyedropper / Entire Image">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M11.58,2.09C10.6,2.09 9.66,2.26 8.78,2.6C3.13,4.9 1.4,11.3 3.71,16.94C5.12,20.5 8.32,22.47 11.58,22.47C12.56,22.47 13.5,22.3 14.38,21.95L18.8,17.54L14.96,13.7L11.58,17.08L10.16,15.66L13.54,12.28L9.7,8.44L5.29,12.85C4.58,11.11 4.86,9.1 6,7.56C7.63,5.33 10.87,4.73 13.1,6.36L15.5,3.96C14.44,2.77 13.06,2.09 11.58,2.09M21,7.21L14.79,13.42L12.91,11.54L19.13,5.33L17,3.21L14.88,5.33L10.74,1.19L12.16,0L22.41,10.25L21,11.66L18.88,9.54L17,11.42L21,15.42L22.88,13.54L21,11.66V7.21Z" /></svg>
-                        </button>
-                        <button class="tool-btn" id="tool-rect" title="Rectangle Select">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M3,3V21H21V3H3M19,19H5V5H19V19Z" /></svg>
-                        </button>
-                        <button class="tool-btn" id="tool-lasso" title="Lasso Select">
-                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M9.6,11.35C8.36,10.6 8,9.05 8.76,7.8C9.5,6.55 11.05,6.19 12.3,6.95C12.9,7.3 13.35,7.86 13.6,8.5L16.5,7.15C15.5,5 13.7,3.85 11.5,3.85C8.5,3.85 6,6.35 6,9.35C6,11.6 7.4,13.55 9.45,14.4L11.8,19.85L18.15,18.5L15.8,13.05L13.1,14.35C14.35,13.6 15,12.05 14.24,10.8C13.5,9.55 11.94,9.19 10.7,9.95C10.1,10.3 9.65,10.86 9.4,11.5L6.5,10.15C7.5,8 9.3,6.85 11.5,6.85C14.5,6.85 17,9.35 17,12.35C17,14.6 15.6,16.55 13.55,17.4L11.2,22.85L4.85,21.5L7.2,16.05L9.6,11.35Z" /></svg>
-                        </button>
-                    </div>
-                    <div class="selection-actions">
-                        <button id="undo-selection-btn" disabled>Undo Last Selection</button>
-                        <button id="clear-selection-btn" class="clear-all-btn" disabled>Clear All Selections</button>
-                    </div>
-                </div>
-                
-                <!-- Step 5 & 6 -->
-                <div class="tolerance-section">
-                    <h2>5. Set Tolerance</h2>
+                <!-- Step 4: Refine Tolerance -->
+                <div class="control-box" data-help-topic="tolerance">
+                    <h2>Step 4: Refine with Tolerance</h2>
+                    <p>Adjust the slider to control how many similar shades are replaced. See the changes live on the image.</p>
                     <input type="range" id="toleranceSlider" min="0" max="100" value="10">
                     <span id="toleranceValue">Tolerance: 10</span>
                 </div>
-                <div class="mode-section">
-                    <h2>6. Replacement Mode</h2>
-                    <div class="toggle-switch-container">
+
+                <!-- Step 5: Isolate (Optional) -->
+                <div class="control-box" data-help-topic="selections">
+                     <h2>Step 5: Isolate with Selections (Optional)</h2>
+                     <p>Use these tools to limit the color replacement to a specific area.</p>
+                    <div class="tool-group">
+                        <button class="tool-btn active" id="tool-none" title="Entire Image / Eyedropper">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M11.58,2.09C10.6,2.09 9.66,2.26 8.78,2.6C3.13,4.9 1.4,11.3 3.71,16.94C5.12,20.5 8.32,22.47 11.58,22.47C12.56,22.47 13.5,22.3 14.38,21.95L18.8,17.54L14.96,13.7L11.58,17.08L10.16,15.66L13.54,12.28L9.7,8.44L5.29,12.85C4.58,11.11 4.86,9.1 6,7.56C7.63,5.33 10.87,4.73 13.1,6.36L15.5,3.96C14.44,2.77 13.06,2.09 11.58,2.09M21,7.21L14.79,13.42L12.91,11.54L19.13,5.33L17,3.21L14.88,5.33L10.74,1.19L12.16,0L22.41,10.25L21,11.66L18.88,9.54L17,11.42L21,15.42L22.88,13.54L21,11.66V7.21Z" /></svg>
+                        </button>
+                        <button class="tool-btn" id="tool-rect" title="Rectangle Select">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3,3V21H21V3H3M19,19H5V5H19V19Z" /></svg>
+                        </button>
+                        <button class="tool-btn" id="tool-lasso" title="Lasso Select">
+                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.6,11.35C8.36,10.6 8,9.05 8.76,7.8C9.5,6.55 11.05,6.19 12.3,6.95C12.9,7.3 13.35,7.86 13.6,8.5L16.5,7.15C15.5,5 13.7,3.85 11.5,3.85C8.5,3.85 6,6.35 6,9.35C6,11.6 7.4,13.55 9.45,14.4L11.8,19.85L18.15,18.5L15.8,13.05L13.1,14.35C14.35,13.6 15,12.05 14.24,10.8C13.5,9.55 11.94,9.19 10.7,9.95C10.1,10.3 9.65,10.86 9.4,11.5L6.5,10.15C7.5,8 9.3,6.85 11.5,6.85C14.5,6.85 17,9.35 17,12.35C17,14.6 15.6,16.55 13.55,17.4L11.2,22.85L4.85,21.5L7.2,16.05L9.6,11.35Z" /></svg>
+                        </button>
+                    </div>
+                    <div class="selection-actions">
+                        <button id="undo-selection-btn" class="btn btn-tertiary" disabled>Undo Last Selection</button>
+                        <button id="clear-selection-btn" class="btn btn-danger" disabled>Clear All</button>
+                    </div>
+                </div>
+                
+                <!-- Step 6: Finalize -->
+                <div class="control-box actions" data-help-topic="finalize">
+                    <h2>Step 6: Apply and Finalize</h2>
+                    <p>When the preview is perfect, apply the change. You can undo any applied changes.</p>
+                     <div class="toggle-switch-container">
                         <span>Flat Color</span>
                         <label class="toggle-switch">
                             <input type="checkbox" id="mode-toggle" checked>
@@ -111,13 +122,11 @@
                         </label>
                         <span>Advanced (Natural)</span>
                     </div>
-                </div>
-                
-                <!-- Step 7 -->
-                <div class="actions">
-                    <button id="replaceBtn" class="action-btn" disabled>7. Replace Color</button>
-                    <button id="undoBtn" disabled>Undo</button>
-                    <button id="downloadBtn" disabled>Download</button>
+                    <button id="commitBtn" class="btn btn-success" disabled>Apply & Save Step</button>
+                    <div class="final-actions">
+                        <button id="undoBtn" class="btn btn-warning" disabled>Undo</button>
+                        <button id="downloadBtn" class="btn btn-secondary" disabled>Download</button>
+                    </div>
                 </div>
             </div>
 
@@ -128,19 +137,94 @@
                 <div id="placeholder-text">Your image will appear here</div>
                 <div id="color-preview" style="display: none;">
                     <div id="preview-swatch"></div>
-                    <div id="preview-text"><span id="preview-hex"></span><span id="preview-rgb"></span></div>
+                    <div id="preview-text"><span id="preview-hex"></span><br><span id="preview-rgb"></span></div>
                 </div>
             </div>
-        </div>
+        </main>
     </div>
 
+    <!-- Help Modal -->
+    <div id="help-modal" class="hidden">
+        <div class="help-content">
+            <button id="help-close-btn" class="btn-icon">&times;</button>
+            <header>
+                <h2>User Manual</h2>
+                <p>Press <kbd>?</kbd> at any time to open this guide. It will automatically scroll to the relevant section.</p>
+            </header>
+
+            <section id="help-topic-introduction">
+                <h3>👋 Welcome!</h3>
+                <p>This tool allows you to replace a specific color in an image with a new one, giving you precise control over the tolerance and area of effect.</p>
+            </section>
+            
+            <section id="help-topic-upload">
+                <h3>📁 Step 1: Upload Image</h3>
+                <p>Click the <strong>"Upload Image"</strong> button to begin. This is the image you will be editing.</p>
+            </section>
+
+            <section id="help-topic-pick-color">
+                <h3>🎨 Step 2: Pick Original Color</h3>
+                <p>With the eyedropper tool active, move your mouse over the main image and <strong>click the color you want to replace.</strong></p>
+                <ul>
+                    <li>The color swatch will update to show your selection.</li>
+                    <li>If you make a mistake, simply click on a different color or use the '×' button to clear your selection.</li>
+                </ul>
+            </section>
+            
+            <section id="help-topic-new-color">
+                <h3>🌈 Step 3: Choose New Color</h3>
+                <p>Here you select the color that will replace the original.</p>
+                <ul>
+                    <li><strong>Picker & Manual:</strong> Use the color wheel for a visual selection or type in exact HEX/RGB values for precision.</li>
+                    <li><strong>From Image:</strong> Upload a secondary "palette" image. You can then click anywhere on this palette to sample a color from it directly.</li>
+                </ul>
+            </section>
+
+            <section id="help-topic-tolerance">
+                <h3>🎚️ Step 4: Refine with Tolerance</h3>
+                <p>This is the most critical step for a clean result. As soon as you pick an original color, a <strong>live preview</strong> of the replacement appears.</p>
+                <ul>
+                    <li>A <strong>low tolerance</strong> (e.g., 5-10) only replaces pixels that are an almost identical match.</li>
+                    <li>A <strong>high tolerance</strong> (e.g., 50+) replaces a much wider range of similar shades and tones.</li>
+                    <li>Adjust the slider until the live preview on your image looks perfect.</li>
+                </ul>
+            </section>
+
+            <section id="help-topic-selections">
+                <h3>✂️ Step 5: Isolate with Selections (Optional)</h3>
+                <p>If you only want to change a color in a specific part of the image, use these tools. The effect will be limited to the selected areas.</p>
+                <ul>
+                    <li><strong>Rectangle Tool:</strong> Click and drag to draw a box.</li>
+                    <li><strong>Lasso Tool:</strong> Click and draw a free-form shape.</li>
+                    <li>You can create multiple selections. Use the "Clear All" button to remove them.</li>
+                </ul>
+            </section>
+
+            <section id="help-topic-finalize">
+                <h3>💾 Step 6: Apply and Finalize</h3>
+                <p>This is where you confirm your changes and export your image.</p>
+                <ul>
+                    <li><strong>Replacement Mode:</strong>
+                        <ul>
+                            <li><strong>Advanced (Natural):</strong> (Recommended) Changes the color's hue but preserves the original brightness and texture for a realistic look.</li>
+                            <li><strong>Flat Color:</strong> Replaces every pixel with the solid new color. Good for graphics and logos.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Apply & Save Step:</strong> Click this to "lock in" the current preview. This is necessary before you can download or undo.</li>
+                    <li><strong>Undo:</strong> Reverts the last "applied" step.</li>
+                    <li><strong>Download:</strong> Saves the final image to your device as a PNG file.</li>
+                </ul>
+            </section>
+        </div>
+    </div>
+    
     <div id="download-overlay">
         <div class="overlay-content">
             <h3 id="progress-text">Preparing your image...</h3>
             <div class="progress-bar-container">
                 <div id="progress-bar-fill"></div>
             </div>
-            <button id="close-overlay-btn" style="display: none;">Close</button>
+            <button id="close-overlay-btn" class="btn btn-secondary" style="display: none;">Close</button>
         </div>
     </div>
     
