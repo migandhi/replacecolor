@@ -73,6 +73,7 @@ input[type="color"] { width: 40px; height: 40px; border: none; padding: 0; borde
 .tool-btn { background: #f0f0f0; border: 1px solid #ddd; width: 50px; height: 40px; border-radius: 5px; transition: all 0.2s; cursor: pointer; display: flex; justify-content: center; align-items: center; }
 .tool-btn svg { width: 24px; height: 24px; }
 .tool-btn.active { background: #007bff; color: white; border-color: #007bff; }
+.tool-btn.active svg { fill: white; }
 .selection-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; }
 #undo-selection-btn { background-color: #ffc107; }
 .clear-all-btn { background-color: #dc3545; color: white; }
