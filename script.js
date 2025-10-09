@@ -14,6 +14,7 @@ const previewRgb = document.getElementById('preview-rgb');
 const selectedColorSwatch = document.getElementById('selected-color-swatch');
 const selectedHex = document.getElementById('selected-hex');
 const selectedRgb = document.getElementById('selected-rgb');
+const pickColorInstruction = document.getElementById('pick-color-instruction');
 const colorPicker = document.getElementById('colorPicker');
 const hexInput = document.getElementById('hexInput');
 const rInput = document.getElementById('rInput');
@@ -28,7 +29,6 @@ const paletteSelectionHex = document.getElementById('palette-selection-hex');
 const paletteSelectionRgb = document.getElementById('palette-selection-rgb');
 const tabButtons = document.querySelectorAll('.tab-button');
 const tabContents = document.querySelectorAll('.tab-content');
-const commitBtn = document.getElementById('commitBtn');
 const undoBtn = document.getElementById('undoBtn');
 const downloadBtn = document.getElementById('downloadBtn');
 const toleranceSlider = document.getElementById('toleranceSlider');
@@ -48,8 +48,8 @@ const closeOverlayBtn = document.getElementById('close-overlay-btn');
 let isImageLoaded = false;
 let history = [];
 let selectedColor = null;
-let lastConfirmedColorToReplace = null;
 let previewTimeout;
+let debounceTimeout;
 let isInteracting = false;
 let selections = [];
 let currentTool = 'none';
@@ -58,8 +58,31 @@ let animationFrameId;
 
 const DEFAULT_NEW_COLOR = "#0099ff";
 
+// --- Intelligent Undo System ---
+function saveState() {
+    if (!isImageLoaded) return;
+    // Create a deep copy of selections to avoid reference issues
+    const selectionsCopy = JSON.parse(JSON.stringify(selections));
+    const currentState = {
+        imageData: ctx.getImageData(0, 0, canvas.width, canvas.height),
+        selections: selectionsCopy
+    };
+    history.push(currentState);
+    updateButtonStates();
+}
+
+function restoreState(state) {
+    if (!state) return;
+    ctx.putImageData(state.imageData, 0, 0);
+    selections = JSON.parse(JSON.stringify(state.selections));
+    redrawMaskFromSelections();
+    updateButtonStates();
+}
+
 // --- Image Loading ---
-imageLoader.addEventListener('change', e => loadImage(e, true));
+imageLoader.addEventListener('change', e => {
+    loadImage(e, true);
+});
 paletteImageLoader.addEventListener('change', e => loadImage(e, false));
 
 function loadImage(e, isMainImage) {
@@ -76,12 +99,11 @@ function loadImage(e, isMainImage) {
                 maskCanvas.height = img.height;
                 ctx.drawImage(img, 0, 0);
                 placeholderText.style.display = 'none';
-                history = [ctx.getImageData(0, 0, canvas.width, canvas.height)];
+                history = []; // Reset history
+                isImageLoaded = true;
+                saveState(); // Save the initial state
                 clearAllSelections();
                 clearSelectedColor();
-                lastConfirmedColorToReplace = null;
-                isImageLoaded = true;
-                updateButtonStates();
             } else {
                 paletteCanvas.width = img.width;
                 paletteCanvas.height = img.height;
@@ -92,7 +114,9 @@ function loadImage(e, isMainImage) {
         };
         img.src = event.target.result;
     };
-    reader.readAsDataURL(e.target.files[0]);
+    if (e.target.files[0]) {
+        reader.readAsDataURL(e.target.files[0]);
+    }
 }
 
 // --- Tool Selection & Drawing Logic ---
@@ -105,17 +129,23 @@ toolBtns.forEach(btn => {
     });
 });
 
-clearSelectionBtn.addEventListener('click', clearAllSelections);
+clearSelectionBtn.addEventListener('click', () => {
+    clearAllSelections();
+    saveState();
+});
+
 undoSelectionBtn.addEventListener('click', () => {
     if (selections.length > 0) {
         selections.pop();
         redrawMaskFromSelections();
+        saveState();
     }
 });
 clearSelectedColorBtn.addEventListener('click', () => {
     clearSelectedColor();
+    // Revert the canvas to its last saved state, removing any active preview.
     if (history.length > 0) {
-        ctx.putImageData(history[history.length - 1], 0, 0);
+        ctx.putImageData(history[history.length - 1].imageData, 0, 0);
     }
 });
 resetNewColorBtn.addEventListener('click', () => syncColorInputs(DEFAULT_NEW_COLOR, 'hex'));
@@ -152,10 +182,11 @@ selectionCanvas.addEventListener('mousedown', (e) => {
             const { r, g, b } = getColorAtCursor(upEvent, canvas, ctx);
             selectedColor = { r, g, b };
             updateSelectedColorUI();
-            replaceColor(selectedColor, false);
+            replaceColor();
         } else if (hasMoved && currentTool !== 'none') {
             commitCurrentPathToSelections();
             redrawMaskFromSelections();
+            saveState();
         }
         
         isInteracting = false;
@@ -168,6 +199,7 @@ selectionCanvas.addEventListener('mousedown', (e) => {
 });
 
 function commitCurrentPathToSelections() {
+    if (currentPath.length < 2) return;
     if (currentTool === 'rect') {
         const start = currentPath[0];
         const end = currentPath[currentPath.length - 1];
@@ -260,14 +292,15 @@ function animateSelectionBoundaries() {
 
 function clearAllSelections() {
     selections = [];
-    maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
-    updateButtonStates();
+    redrawMaskFromSelections();
 }
 
 // --- Main Replacement Function ---
-function replaceColor(colorToReplace, saveToHistory) {
-    if (!isImageLoaded || !colorToReplace) return;
-    const sourceImageData = history[history.length - 1];
+function replaceColor() {
+    if (!isImageLoaded || !selectedColor || history.length === 0) return;
+    
+    // Always work from the last saved state for previews
+    const sourceImageData = history[history.length - 1].imageData;
     const newImageData = new ImageData(new Uint8ClampedArray(sourceImageData.data), sourceImageData.width, sourceImageData.height);
     const data = newImageData.data;
     const maskData = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height).data;
@@ -277,7 +310,7 @@ function replaceColor(colorToReplace, saveToHistory) {
     const tolerance = toleranceSlider.value;
     const isAdvancedMode = modeToggle.checked;
     const newColorHsl = isAdvancedMode ? rgbToHsl(newColorRgb.r, newColorRgb.g, newColorRgb.b) : null;
-    const targetLab = rgbToLab(colorToReplace.r, colorToReplace.g, colorToReplace.b);
+    const targetLab = rgbToLab(selectedColor.r, selectedColor.g, selectedColor.b);
 
     for (let i = 0; i < data.length; i += 4) {
         if (hasSelection && maskData[i + 3] === 0) {
@@ -299,33 +332,23 @@ function replaceColor(colorToReplace, saveToHistory) {
         }
     }
     ctx.putImageData(newImageData, 0, 0);
-    if (saveToHistory) {
-        history.push(newImageData);
-        updateButtonStates();
-    }
 }
 
 // --- Event Listeners and UI Updates ---
-commitBtn.addEventListener('click', () => {
-    if (!selectedColor) return;
-    lastConfirmedColorToReplace = selectedColor;
-    replaceColor(lastConfirmedColorToReplace, true);
-});
 toleranceSlider.addEventListener('input', () => {
     toleranceValue.textContent = `Tolerance: ${toleranceSlider.value}`;
-    if (!selectedColor) return;
     clearTimeout(previewTimeout);
-    previewTimeout = setTimeout(() => {
-        replaceColor(selectedColor, false);
-    }, 10);
+    previewTimeout = setTimeout(replaceColor, 10);
+
+    // Debounce saving state to history
+    clearTimeout(debounceTimeout);
+    debounceTimeout = setTimeout(saveState, 500);
 });
+
 undoBtn.addEventListener('click', () => {
     if (history.length > 1) {
         history.pop();
-        lastConfirmedColorToReplace = null;
-        ctx.putImageData(history[history.length - 1], 0, 0);
-        clearAllSelections();
-        updateButtonStates();
+        restoreState(history[history.length - 1]);
     }
 });
 downloadBtn.addEventListener('click', () => {
@@ -366,15 +389,13 @@ tabButtons.forEach(button => {
     });
 });
 function updateButtonStates() {
-    commitBtn.disabled = !selectedColor || !isImageLoaded;
-    downloadBtn.disabled = history.length <= 1;
     undoBtn.disabled = history.length <= 1;
+    downloadBtn.disabled = !isImageLoaded;
     clearSelectionBtn.disabled = selections.length === 0;
     undoSelectionBtn.disabled = selections.length === 0;
 }
 function clearSelectedColor() {
     selectedColor = null;
-    lastConfirmedColorToReplace = null;
     updateSelectedColorUI();
 }
 function updateSelectedColorUI() {
@@ -383,10 +404,17 @@ function updateSelectedColorUI() {
         selectedColorSwatch.style.backgroundColor = hex;
         selectedHex.textContent = `HEX: ${hex}`;
         selectedRgb.textContent = `RGB: ${selectedColor.r}, ${selectedColor.g}, ${selectedColor.b}`;
+        pickColorInstruction.classList.add('hidden');
     } else {
         selectedColorSwatch.style.backgroundColor = '#f0f0f0';
         selectedHex.textContent = 'HEX: --';
         selectedRgb.textContent = 'RGB: --, --, --';
+        pickColorInstruction.classList.remove('hidden');
+        if (selections.length > 0) {
+            pickColorInstruction.textContent = "Use the eyedropper to click a color inside the selected area.";
+        } else {
+            pickColorInstruction.textContent = "Use the eyedropper to click on the color to replace.";
+        }
     }
     updateButtonStates();
 }
@@ -411,28 +439,33 @@ function updatePreviewTooltip(e, r, g, b) {
     previewSwatch.style.backgroundColor = hex;
     previewHex.textContent = hex;
     previewRgb.textContent = `RGB(${r}, ${g}, ${b})`;
-
     const tooltip = colorPreview;
     const offsetX = 20;
     const offsetY = 20;
-
     tooltip.style.display = 'flex'; 
     const tooltipRect = tooltip.getBoundingClientRect();
-    
     let x = e.clientX + offsetX;
     let y = e.clientY + offsetY;
-
     if (x + tooltipRect.width > window.innerWidth) { x = e.clientX - tooltipRect.width - offsetX; }
     if (y + tooltipRect.height > window.innerHeight) { y = e.clientY - tooltipRect.height - offsetY; }
     if (x < 0) x = offsetX;
     if (y < 0) y = offsetY;
-    
     tooltip.style.left = `${x}px`;
     tooltip.style.top = `${y}px`;
 }
-colorPicker.addEventListener('input', () => syncColorInputs(colorPicker.value, 'picker'));
-hexInput.addEventListener('input', () => syncColorInputs(hexInput.value, 'hex'));
-[rInput, gInput, bInput].forEach(input => input.addEventListener('input', () => syncColorInputs(null, 'rgb')));
+[colorPicker, hexInput, rInput, gInput, bInput].forEach(el => {
+    el.addEventListener('input', () => {
+        if(el.id === 'hexInput') syncColorInputs(hexInput.value, 'hex');
+        else if (['rInput', 'gInput', 'bInput'].includes(el.id)) syncColorInputs(null, 'rgb');
+        else syncColorInputs(colorPicker.value, 'picker');
+        
+        if (selectedColor) {
+            replaceColor();
+            clearTimeout(debounceTimeout);
+            debounceTimeout = setTimeout(saveState, 500);
+        }
+    });
+});
 function syncColorInputs(color, source) {
     let r, g, b, hex;
     if (source === 'picker' || source === 'hex') {
@@ -504,7 +537,6 @@ function hslToRgb(h, s, l) {
         const hue2rgb = (p, q, t) => {
             if (t < 0) t += 1;
             if (t > 1) t -= 1;
-            if (t < 1/6) return p + (q - p) * 6 * t;
             if (t < 1/2) return q;
             if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
             return p;
@@ -523,9 +555,8 @@ const helpModal = document.getElementById('help-modal');
 const helpBtn = document.getElementById('help-btn');
 const helpCloseBtn = document.getElementById('help-close-btn');
 const controlBoxes = document.querySelectorAll('.control-box');
-let currentHelpTopic = 'introduction'; // Default topic
+let currentHelpTopic = 'introduction';
 
-// Function to open the help modal and scroll to the current topic
 const openHelpModal = () => {
     helpModal.classList.remove('hidden');
     const topicElement = document.getElementById(`help-topic-${currentHelpTopic}`);
@@ -538,14 +569,12 @@ const openHelpModal = () => {
     }
 };
 
-// Function to close the help modal
 const closeHelpModal = () => {
     helpModal.classList.add('hidden');
 };
 
-// Listen for interactions on control boxes to set the current help topic
 controlBoxes.forEach(box => {
-    box.addEventListener('focusin', () => { // 'focusin' captures focus on any child element
+    box.addEventListener('focusin', () => {
         currentHelpTopic = box.dataset.helpTopic;
     });
      box.addEventListener('click', () => {
@@ -553,11 +582,9 @@ controlBoxes.forEach(box => {
     });
 });
 
-// Listen for the '?' key press to open the modal
 document.addEventListener('keydown', (e) => {
     if (e.key === '?') {
-        // Avoid typing '?' in input fields
-        if (e.target.tagName !== 'INPUT') {
+        if (document.activeElement.tagName !== 'INPUT') {
             e.preventDefault();
             openHelpModal();
         }
@@ -570,7 +597,7 @@ document.addEventListener('keydown', (e) => {
 helpBtn.addEventListener('click', openHelpModal);
 helpCloseBtn.addEventListener('click', closeHelpModal);
 helpModal.addEventListener('click', (e) => {
-    if (e.target === helpModal) { // Close if clicking on the overlay backdrop
+    if (e.target === helpModal) {
         closeHelpModal();
     }
 });

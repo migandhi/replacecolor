@@ -52,7 +52,7 @@ header {
 
 h1 { margin: 0; color: var(--text-color); font-size: 2em; }
 h2 { font-size: 1.25em; margin: 0 0 8px 0; color: var(--text-color); }
-p { font-size: 0.9em; color: var(--text-muted); margin: 0 0 16px 0; max-width: 90%; }
+p { font-size: 0.9em; color: var(--text-muted); margin: 0 0 16px 0; max-width: 100%; }
 kbd {
     background-color: #e9ecef;
     padding: 2px 6px;
@@ -102,7 +102,7 @@ kbd {
 .btn-icon:hover { background: #f1f3f5; color: var(--text-color); }
 input[type="file"] { display: none; }
 
-.final-actions { display: flex; gap: 10px; margin-top: 10px; }
+.final-actions { display: flex; gap: 10px; margin-top: 16px; }
 .final-actions .btn { flex-grow: 1; }
 
 /* --- Color Displays & Inputs --- */
@@ -123,10 +123,10 @@ input[type="color"] { width: 48px; height: 48px; border: none; padding: 0; borde
 .selection-actions .btn { flex-grow: 1; padding: 8px 10px; }
 
 /* --- Sliders & Toggles --- */
-input[type="range"] { -webkit-appearance: none; width: 100%; height: 8px; background: #e9ecef; border-radius: 5px; outline: none; margin-top: 10px; }
+input[type="range"] { -webkit-appearance: none; width: 100%; height: 8px; background: #e9ecef; border-radius: 5px; outline: none; margin: 16px 0 8px 0; }
 input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; background: var(--primary-color); cursor: pointer; border-radius: 50%; }
-#toleranceValue { text-align: center; margin-top: 8px; display: block; color: var(--text-color); font-weight: 500; font-family: monospace; }
-.toggle-switch-container { display: flex; justify-content: space-between; align-items: center; padding: 10px 0 16px 0; }
+#toleranceValue { text-align: center; display: block; color: var(--text-color); font-weight: 500; font-family: monospace; }
+.toggle-switch-container { display: flex; justify-content: space-between; align-items: center; padding: 16px 0 0 0; }
 .toggle-switch-container span { font-size: 0.9em; color: var(--text-color); font-weight: 500; }
 .toggle-switch { position: relative; display: inline-block; width: 60px; height: 34px; }
 .toggle-switch input { opacity: 0; width: 0; height: 0; }
